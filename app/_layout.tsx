@@ -8,12 +8,18 @@ import { SplashScreen } from 'expo-router';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { RestaurantProvider } from '@/contexts/RestaurantContext';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { activateKeepAwake } from 'expo-keep-awake';
 
 // Prevent splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   useFrameworkReady();
+
+  // Activate keep awake when the app starts
+  useEffect(() => {
+    activateKeepAwake();
+  }, []);
 
   const [fontsLoaded, fontError] = useFonts({
     'Poppins-Regular': Poppins_400Regular,

@@ -5,20 +5,46 @@ import { useRestaurant } from '@/contexts/RestaurantContext';
 import { RestaurantCard } from '@/components/restaurant/RestaurantCard';
 import { Header } from '@/components/app/Header';
 import { Button } from '@/components/ui/Button';
-import { RefreshCw } from 'lucide-react-native';
+import { RefreshCw, Settings } from 'lucide-react-native';
 import { Colors, Spacing } from '@/constants/Colors';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 
 export default function RestaurantList() {
   const router = useRouter();
   const { userRestaurants, loading, error, fetchUserRestaurants, selectRestaurant } = useRestaurant();
+  const { user } = useAuth();
+  const [isAppOwner, setIsAppOwner] = React.useState(false);
 
   useEffect(() => {
     fetchUserRestaurants();
+    checkAppOwner();
   }, []);
+
+  const checkAppOwner = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('app_owner')
+        .eq('id', user.id)
+        .single();
+      
+      if (error) throw error;
+      setIsAppOwner(data?.app_owner || false);
+    } catch (error) {
+      console.error('Error checking app owner status:', error);
+    }
+  };
 
   const handleSelectRestaurant = (restaurant: any) => {
     selectRestaurant(restaurant);
     router.push(`/restaurant/${restaurant.id}`);
+  };
+
+  const handleSetupPress = () => {
+    router.push('/setup');
   };
 
   return (
@@ -26,7 +52,18 @@ export default function RestaurantList() {
       <Header showProfile={true} />
       
       <View style={styles.content}>
-        <Text style={styles.title}>Your Restaurants</Text>
+        <View style={styles.titleContainer}>
+          <Text style={styles.title}>Your Restaurants</Text>
+          {isAppOwner && (
+            <Button
+              title="Setup"
+              variant="outline"
+              onPress={handleSetupPress}
+              leftIcon={<Settings size={16} color={Colors.primary[600]} />}
+              style={styles.setupButton}
+            />
+          )}
+        </View>
         
         {error && (
           <View style={styles.errorContainer}>
@@ -77,11 +114,19 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: Spacing.md,
   },
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.lg,
+  },
   title: {
     fontFamily: 'Poppins-Bold',
     fontSize: 24,
     color: Colors.neutral[900],
-    marginBottom: Spacing.lg,
+  },
+  setupButton: {
+    minWidth: 100,
   },
   listContainer: {
     paddingBottom: Spacing.xl,

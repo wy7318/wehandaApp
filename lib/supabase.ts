@@ -20,9 +20,9 @@ const webStorage = {
 
 // Use SecureStore for native platforms, localStorage for web
 const storage = Platform.OS === 'web' ? webStorage : {
-  getItem: SecureStore.getItemAsync,
-  setItem: SecureStore.setItemAsync,
-  removeItem: SecureStore.deleteItemAsync,
+  getItem: (key: string) => SecureStore.getItemAsync(key),
+  setItem: (key: string, value: string) => SecureStore.setItemAsync(key, value),
+  removeItem: (key: string) => SecureStore.deleteItemAsync(key),
 };
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;

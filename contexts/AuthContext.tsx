@@ -6,6 +6,44 @@ import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
 const BIOMETRICS_ENABLED_KEY = 'biometrics_enabled';
+const AUTH_SESSION_KEY = 'auth_session';
+
+// Web storage adapter
+const webStorage = {
+  getItem: (key: string): Promise<string | null> => {
+    return Promise.resolve(localStorage.getItem(key));
+  },
+  setItem: (key: string, value: string): Promise<void> => {
+    localStorage.setItem(key, value);
+    return Promise.resolve();
+  },
+  removeItem: (key: string): Promise<void> => {
+    localStorage.removeItem(key);
+    return Promise.resolve();
+  },
+};
+
+// Storage helper functions
+const getStorageItem = async (key: string): Promise<string | null> => {
+  if (Platform.OS === 'web') {
+    return webStorage.getItem(key);
+  }
+  return SecureStore.getItemAsync(key);
+};
+
+const setStorageItem = async (key: string, value: string): Promise<void> => {
+  if (Platform.OS === 'web') {
+    return webStorage.setItem(key, value);
+  }
+  return SecureStore.setItemAsync(key, value);
+};
+
+const removeStorageItem = async (key: string): Promise<void> => {
+  if (Platform.OS === 'web') {
+    return webStorage.removeItem(key);
+  }
+  return SecureStore.deleteItemAsync(key);
+};
 
 type AuthContextType = {
   user: User | null;
@@ -46,7 +84,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const enrolled = await LocalAuthentication.isEnrolledAsync();
         if (isMounted.current) {
           setHasBiometrics(compatible && enrolled);
-          const enabled = await SecureStore.getItemAsync(BIOMETRICS_ENABLED_KEY);
+          const enabled = await getStorageItem(BIOMETRICS_ENABLED_KEY);
           setBiometricsEnabled(enabled === 'true');
         }
       }
@@ -63,6 +101,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setSession(session);
           setUser(session?.user ?? null);
           setLoading(false);
+
+          // Store session if user is logged in and biometrics is enabled
+          if (session && (await getStorageItem(BIOMETRICS_ENABLED_KEY)) === 'true') {
+            await setStorageItem(AUTH_SESSION_KEY, JSON.stringify(session));
+          }
         }
       }
     );
@@ -88,6 +131,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email,
         password,
       });
+
+      if (!error) {
+        // Get the current session after successful login
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session && biometricsEnabled) {
+          // Store the session securely
+          await setStorageItem(AUTH_SESSION_KEY, JSON.stringify(session));
+        }
+      }
+
       return { error };
     } catch (error) {
       return { error };
@@ -96,10 +149,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Sign out
   const signOut = async () => {
+    if (Platform.OS !== 'web') {
+      // Only remove the stored session if biometrics is disabled
+      const enabled = await getStorageItem(BIOMETRICS_ENABLED_KEY);
+      if (enabled !== 'true') {
+        await removeStorageItem(AUTH_SESSION_KEY);
+      }
+    }
     await supabase.auth.signOut();
   };
 
-  // Enable biometrics (native only)
+  // Enable biometrics
   const enableBiometrics = async () => {
     if (Platform.OS === 'web') {
       return;
@@ -111,24 +171,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
     
     if (result.success && isMounted.current) {
-      await SecureStore.setItemAsync(BIOMETRICS_ENABLED_KEY, 'true');
+      await setStorageItem(BIOMETRICS_ENABLED_KEY, 'true');
+      // Store current session when enabling biometrics
+      if (session) {
+        await setStorageItem(AUTH_SESSION_KEY, JSON.stringify(session));
+      }
       setBiometricsEnabled(true);
     }
   };
 
-  // Disable biometrics (native only)
+  // Disable biometrics
   const disableBiometrics = async () => {
     if (Platform.OS === 'web') {
       return;
     }
 
     if (isMounted.current) {
-      await SecureStore.deleteItemAsync(BIOMETRICS_ENABLED_KEY);
+      await removeStorageItem(BIOMETRICS_ENABLED_KEY);
+      await removeStorageItem(AUTH_SESSION_KEY);
       setBiometricsEnabled(false);
     }
   };
 
-  // Sign in with biometrics (native only)
+  // Sign in with biometrics
   const signInWithBiometrics = async () => {
     if (Platform.OS === 'web') {
       return { error: new Error('Biometric authentication not available on web') };
@@ -136,9 +201,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     try {
       // Check if credentials are stored and biometrics is enabled
-      const enabled = await SecureStore.getItemAsync(BIOMETRICS_ENABLED_KEY);
+      const enabled = await getStorageItem(BIOMETRICS_ENABLED_KEY);
       if (enabled !== 'true') {
         return { error: new Error('Biometric authentication not enabled') };
+      }
+
+      // Get stored session
+      const storedSession = await getStorageItem(AUTH_SESSION_KEY);
+      if (!storedSession) {
+        return { error: new Error('No stored session found') };
       }
 
       // Authenticate with biometrics
@@ -148,14 +219,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       if (result.success) {
-        // Automatically sign in using the stored session
-        const { data, error } = await supabase.auth.getSession();
+        // Parse and use the stored session
+        const sessionData = JSON.parse(storedSession);
+        const { error } = await supabase.auth.setSession({
+          access_token: sessionData.access_token,
+          refresh_token: sessionData.refresh_token,
+        });
         
-        if (data?.session) {
-          return { error: null };
-        } else {
-          return { error: new Error('No active session found') };
+        if (error) {
+          throw error;
         }
+        
+        return { error: null };
       } else {
         return { error: new Error('Biometric authentication failed') };
       }

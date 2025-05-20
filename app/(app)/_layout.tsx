@@ -21,6 +21,7 @@ export default function AppLayout() {
       <Stack.Screen name="index" />
       <Stack.Screen name="restaurant/[id]" />
       <Stack.Screen name="profile" />
+      <Stack.Screen name="setup" />
     </Stack>
   );
 }

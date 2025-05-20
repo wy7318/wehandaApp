@@ -24,7 +24,7 @@ export default function RestaurantDetails() {
 
   const handleActivityPress = (activityType: ActivityType) => {
     // For this MVP, we're just showing a message for non-dashboard activities
-    if (activityType !== 'dashboard') {
+    if (activityType !== 'dashboard' && activityType !== 'waitlist') {
       alert(`${activityType.charAt(0).toUpperCase() + activityType.slice(1).replace('-', ' ')} selected.`);
     }
   };
@@ -56,6 +56,7 @@ export default function RestaurantDetails() {
             <ActivityCard
               type={item}
               onPress={() => handleActivityPress(item)}
+              restaurantId={selectedRestaurant.id}
             />
           )}
           numColumns={2}

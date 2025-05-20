@@ -4,6 +4,7 @@ import { Colors, Spacing } from '@/constants/Colors';
 import { User } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useRestaurant } from '@/contexts/RestaurantContext';
+import { NotificationBell } from '../notifications/NotificationBell';
 
 interface HeaderProps {
   showProfile?: boolean;
@@ -28,14 +29,19 @@ export const Header: React.FC<HeaderProps> = ({ showProfile = true }) => {
           )}
         </View>
         
-        {showProfile && (
-          <TouchableOpacity
-            style={styles.profileButton}
-            onPress={handleProfilePress}
-          >
-            <User size={24} color={Colors.neutral[800]} />
-          </TouchableOpacity>
-        )}
+        <View style={styles.actions}>
+          {selectedRestaurant && (
+            <NotificationBell restaurantId={selectedRestaurant.id} />
+          )}
+          {showProfile && (
+            <TouchableOpacity
+              style={styles.profileButton}
+              onPress={handleProfilePress}
+            >
+              <User size={24} color={Colors.neutral[800]} />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -62,6 +68,10 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-Bold',
     fontSize: 20,
     color: Colors.neutral[900],
+  },
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   profileButton: {
     padding: Spacing.xs,

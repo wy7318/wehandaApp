@@ -10,12 +10,13 @@ import { useRestaurant } from '@/contexts/RestaurantContext';
 export default function DashboardScreen() {
   const { selectedRestaurant } = useRestaurant();
   const [showNotification, setShowNotification] = useState(false);
+  const [notificationMessage, setNotificationMessage] = useState('');
 
   useEffect(() => {
     if (!selectedRestaurant) return;
 
     // Subscribe to new orders for the selected restaurant
-    const channel = supabase
+    const orderChannel = supabase
       .channel('orders')
       .on(
         'postgres_changes',
@@ -26,18 +27,39 @@ export default function DashboardScreen() {
           filter: `restaurant_id=eq.${selectedRestaurant.id}`,
         },
         () => {
+          setNotificationMessage('New Order');
+          setShowNotification(true);
+        }
+      )
+      .subscribe();
+
+    // Subscribe to new bookings for the selected restaurant
+    const bookingChannel = supabase
+      .channel('bookings')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'bookings',
+          filter: `restaurant_id=eq.${selectedRestaurant.id}`,
+        },
+        () => {
+          setNotificationMessage('New Reservation');
           setShowNotification(true);
         }
       )
       .subscribe();
 
     return () => {
-      channel.unsubscribe();
+      orderChannel.unsubscribe();
+      bookingChannel.unsubscribe();
     };
   }, [selectedRestaurant]);
 
   const handleDismissNotification = () => {
     setShowNotification(false);
+    setNotificationMessage('');
   };
 
   return (
@@ -47,6 +69,7 @@ export default function DashboardScreen() {
         <BlinkNotification
           visible={showNotification}
           onDismiss={handleDismissNotification}
+          message={notificationMessage}
         />
         <WebView
           source={{ uri: 'https://admin.wehanda.com' }}

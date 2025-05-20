@@ -1,22 +1,31 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Colors, BorderRadius, Spacing } from '@/constants/Colors';
 import { ClipboardList, LayoutDashboard, Utensils, Settings } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import { WaitlistModal } from './WaitlistModal';
 
 export type ActivityType = 'waitlist' | 'dashboard' | 'table-order' | 'settings';
 
 interface ActivityCardProps {
   type: ActivityType;
   onPress: () => void;
+  restaurantId: string;
 }
 
-export const ActivityCard: React.FC<ActivityCardProps> = ({ type, onPress }) => {
+export const ActivityCard: React.FC<ActivityCardProps> = ({
+  type,
+  onPress,
+  restaurantId,
+}) => {
   const router = useRouter();
+  const [showWaitlist, setShowWaitlist] = useState(false);
 
   const handlePress = () => {
     if (type === 'dashboard') {
       router.push('/restaurant/dashboard');
+    } else if (type === 'waitlist') {
+      setShowWaitlist(true);
     } else {
       onPress();
     }
@@ -62,14 +71,22 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({ type, onPress }) => 
   };
 
   return (
-    <TouchableOpacity
-      style={[styles.container, { backgroundColor: getActivityColor() }]}
-      onPress={handlePress}
-      activeOpacity={0.8}
-    >
-      <View style={styles.iconContainer}>{getActivityIcon()}</View>
-      <Text style={styles.title}>{getActivityTitle()}</Text>
-    </TouchableOpacity>
+    <>
+      <TouchableOpacity
+        style={[styles.container, { backgroundColor: getActivityColor() }]}
+        onPress={handlePress}
+        activeOpacity={0.8}
+      >
+        <View style={styles.iconContainer}>{getActivityIcon()}</View>
+        <Text style={styles.title}>{getActivityTitle()}</Text>
+      </TouchableOpacity>
+
+      <WaitlistModal
+        visible={showWaitlist}
+        onClose={() => setShowWaitlist(false)}
+        restaurantId={restaurantId}
+      />
+    </>
   );
 };
 

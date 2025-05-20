@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "EXPO_NO_TELEMETRY=1 expo start",
     "build:web": "expo export --platform web",
+    "build:android": "eas build -p android --profile preview",
     "lint": "expo lint"
   },
   "dependencies": {
@@ -21,6 +22,7 @@
     "expo-constants": "^17.0.5",
     "expo-font": "^13.0.3",
     "expo-haptics": "^14.0.1",
+    "expo-keep-awake": "~12.8.2",
     "expo-linear-gradient": "^14.0.2",
     "expo-linking": "^7.0.5",
     "expo-local-authentication": "^13.6.1",
