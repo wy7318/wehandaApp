@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, forwardRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { WebView } from 'react-native-webview';
 import { StyleSheet, SafeAreaView, Platform, View } from 'react-native';
 import { Colors } from '@/constants/Colors';
@@ -17,7 +17,7 @@ Notifications.setNotificationHandler({
   }),
 });
 
-const DashboardScreen = forwardRef((props, ref) => {
+const DashboardScreen = () => {
   const { selectedRestaurant } = useRestaurant();
   const [showNotification, setShowNotification] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState('');
@@ -138,7 +138,7 @@ const DashboardScreen = forwardRef((props, ref) => {
       </View>
     </SafeAreaView>
   );
-});
+};
 
 const styles = StyleSheet.create({
   container: {
