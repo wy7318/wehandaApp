@@ -25,7 +25,7 @@ export default function RestaurantDetails() {
   const handleActivityPress = (activityType: ActivityType) => {
     // For this MVP, we're just showing a message for non-dashboard activities
     if (activityType !== 'dashboard' && activityType !== 'waitlist') {
-      alert(`${activityType.charAt(0).toUpperCase() + activityType.slice(1).replace('-', ' ')} selected.`);
+      alert(`${activityType.charAt(0).toUpperCase() + activityType.slice(1).replace('-', ' ')} feature coming up soon!`);
     }
   };
 
