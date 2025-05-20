@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { TouchableOpacity, StyleSheet, View, Text, Modal, FlatList, SafeAreaView } from 'react-native';
+import { TouchableOpacity, StyleSheet, View, Text, Modal, FlatList, SafeAreaView, Platform } from 'react-native';
 import { Bell, X, Package, Calendar } from 'lucide-react-native';
 import { Colors, Spacing, BorderRadius } from '@/constants/Colors';
 import { supabase } from '@/lib/supabase';
+import * as Notifications from 'expo-notifications';
 
 interface NotificationBellProps {
   restaurantId: string;
@@ -14,6 +15,17 @@ interface Notification {
   title: string;
   subtitle: string;
   timestamp: Date;
+}
+
+// Configure notifications for Android
+if (Platform.OS !== 'web') {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+    }),
+  });
 }
 
 export const NotificationBell: React.FC<NotificationBellProps> = ({ restaurantId }) => {
@@ -35,16 +47,30 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ restaurantId
           table: 'orders',
           filter: `restaurant_id=eq.${restaurantId}`,
         },
-        (payload) => {
+        async (payload) => {
           setHasNewNotification(true);
           const newOrder = payload.new as any;
-          addNotification({
+          const notification = {
             id: newOrder.id,
             type: 'order',
             title: 'New Order',
             subtitle: `Order #${newOrder.number}`,
             timestamp: new Date(newOrder.created_date),
-          });
+          };
+          
+          addNotification(notification);
+
+          // Show native notification on mobile
+          if (Platform.OS !== 'web') {
+            await Notifications.scheduleNotificationAsync({
+              content: {
+                title: notification.title,
+                body: notification.subtitle,
+                data: { type: 'order', id: notification.id },
+              },
+              trigger: null,
+            });
+          }
         }
       )
       .subscribe();
@@ -60,23 +86,52 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ restaurantId
           table: 'bookings',
           filter: `restaurant_id=eq.${restaurantId}`,
         },
-        (payload) => {
+        async (payload) => {
           setHasNewNotification(true);
           const newBooking = payload.new as any;
-          addNotification({
+          const notification = {
             id: newBooking.id,
             type: 'booking',
             title: 'New Reservation',
             subtitle: `${newBooking.number_of_people} people at ${newBooking.time}`,
             timestamp: new Date(newBooking.created_date),
-          });
+          };
+          
+          addNotification(notification);
+
+          // Show native notification on mobile
+          if (Platform.OS !== 'web') {
+            await Notifications.scheduleNotificationAsync({
+              content: {
+                title: notification.title,
+                body: notification.subtitle,
+                data: { type: 'booking', id: notification.id },
+              },
+              trigger: null,
+            });
+          }
         }
       )
       .subscribe();
 
+    // Set up notification response handler
+    let notificationSubscription: any;
+    if (Platform.OS !== 'web') {
+      notificationSubscription = Notifications.addNotificationResponseReceivedListener(
+        (response) => {
+          const { type, id } = response.notification.request.content.data;
+          // Handle notification tap
+          console.log('Notification tapped:', type, id);
+        }
+      );
+    }
+
     return () => {
       orderChannel.unsubscribe();
       bookingChannel.unsubscribe();
+      if (notificationSubscription) {
+        notificationSubscription.remove();
+      }
     };
   }, [restaurantId]);
 
