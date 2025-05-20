@@ -22,7 +22,7 @@ export default function LoginScreen() {
   useEffect(() => {
     // Check if biometrics can be shown
     const checkBiometrics = async () => {
-      if (Platform.OS !== 'web' && hasBiometrics && biometricsEnabled) {
+      if (hasBiometrics && biometricsEnabled) {
         setShowBiometrics(true);
       }
     };
@@ -40,47 +40,34 @@ export default function LoginScreen() {
     setIsLoading(true);
     
     try {
-      const { error: signInError } = await signIn(email, password);
+      const { error } = await signIn(email, password);
       
-      if (signInError) {
-        console.error('Sign in error:', signInError);
-        if (signInError.message.includes('Failed to fetch')) {
-          setError('Unable to connect to the server. Please check your internet connection.');
-        } else {
-          setError(signInError.message);
-        }
+      if (error) {
+        setError(error.message);
       } else {
         router.replace('/(app)');
       }
     } catch (err: any) {
-      console.error('Login error:', err);
-      setError(err.message || 'An unexpected error occurred');
+      setError(err.message);
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleBiometricAuth = async () => {
-    if (Platform.OS === 'web') {
-      setError('Biometric authentication is not available on web');
-      return;
-    }
-
     setError(null);
     setIsLoading(true);
     
     try {
-      const { error: biometricError } = await signInWithBiometrics();
+      const { error } = await signInWithBiometrics();
       
-      if (biometricError) {
-        console.error('Biometric sign in error:', biometricError);
-        setError(biometricError.message);
+      if (error) {
+        setError(error.message);
       } else {
         router.replace('/(app)');
       }
     } catch (err: any) {
-      console.error('Biometric auth error:', err);
-      setError(err.message || 'An unexpected error occurred');
+      setError(err.message);
     } finally {
       setIsLoading(false);
     }
