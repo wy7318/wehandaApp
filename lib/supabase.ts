@@ -6,15 +6,30 @@ import { Platform } from 'react-native';
 // Web-compatible storage adapter
 const webStorage = {
   getItem: (key: string): Promise<string | null> => {
-    return Promise.resolve(localStorage.getItem(key));
+    try {
+      return Promise.resolve(localStorage.getItem(key));
+    } catch (error) {
+      console.error('Error accessing localStorage:', error);
+      return Promise.resolve(null);
+    }
   },
   setItem: (key: string, value: string): Promise<void> => {
-    localStorage.setItem(key, value);
-    return Promise.resolve();
+    try {
+      localStorage.setItem(key, value);
+      return Promise.resolve();
+    } catch (error) {
+      console.error('Error setting localStorage:', error);
+      return Promise.resolve();
+    }
   },
   removeItem: (key: string): Promise<void> => {
-    localStorage.removeItem(key);
-    return Promise.resolve();
+    try {
+      localStorage.removeItem(key);
+      return Promise.resolve();
+    } catch (error) {
+      console.error('Error removing from localStorage:', error);
+      return Promise.resolve();
+    }
   },
 };
 
@@ -25,10 +40,15 @@ const storage = Platform.OS === 'web' ? webStorage : {
   removeItem: (key: string) => SecureStore.deleteItemAsync(key),
 };
 
+// Ensure environment variables are properly accessed for web
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
+  console.error('Missing Supabase environment variables:', {
+    url: !!supabaseUrl,
+    key: !!supabaseAnonKey,
+  });
   throw new Error('Missing Supabase environment variables');
 }
 
@@ -37,7 +57,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     storage: storage,
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: false,
+    detectSessionInUrl: Platform.OS === 'web',
   },
 });
 
