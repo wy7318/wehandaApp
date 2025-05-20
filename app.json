@@ -19,7 +19,8 @@
         "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.yourcompany.boltexponativewind"
+      "package": "com.yourcompany.boltexponativewind",
+      "versionCode": 1
     },
     "web": {
       "bundler": "metro",
