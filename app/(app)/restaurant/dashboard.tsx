@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { WebView } from 'react-native-webview';
-import { StyleSheet, SafeAreaView, Platform, View } from 'react-native';
+import { StyleSheet, SafeAreaView, Platform, View, TouchableOpacity } from 'react-native';
 import { Colors } from '@/constants/Colors';
 import { Header } from '@/components/app/Header';
 import { BlinkNotification } from '@/components/notifications/BlinkNotification';
 import { supabase } from '@/lib/supabase';
 import { useRestaurant } from '@/contexts/RestaurantContext';
+import * as Linking from 'expo-linking';
 
 export default function DashboardScreen() {
   const { selectedRestaurant } = useRestaurant();
   const [showNotification, setShowNotification] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState('');
+  const [notificationType, setNotificationType] = useState<'order' | 'booking' | null>(null);
 
   useEffect(() => {
     if (!selectedRestaurant) return;
@@ -28,6 +30,7 @@ export default function DashboardScreen() {
         },
         () => {
           setNotificationMessage('New Order');
+          setNotificationType('order');
           setShowNotification(true);
         }
       )
@@ -46,6 +49,7 @@ export default function DashboardScreen() {
         },
         () => {
           setNotificationMessage('New Reservation');
+          setNotificationType('booking');
           setShowNotification(true);
         }
       )
@@ -58,8 +62,21 @@ export default function DashboardScreen() {
   }, [selectedRestaurant]);
 
   const handleDismissNotification = () => {
+    if (!selectedRestaurant) return;
+
+    const baseUrl = 'https://admin.wehanda.com/restaurant';
+    const path = notificationType === 'order' ? 'orders' : 'bookings';
+    const url = `${baseUrl}/${selectedRestaurant.id}/${path}`;
+
+    if (Platform.OS === 'web') {
+      window.location.href = url;
+    } else {
+      Linking.openURL(url);
+    }
+
     setShowNotification(false);
     setNotificationMessage('');
+    setNotificationType(null);
   };
 
   return (
