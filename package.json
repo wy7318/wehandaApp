@@ -1,4 +1,7 @@
 {
+  "scripts": {
+    "dev": "expo start"
+  },
   "dependencies": {
     "date-fns": "^3.3.1"
   }
