@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { WebView } from 'react-native-webview';
-import { StyleSheet, SafeAreaView, Platform, View, TouchableOpacity } from 'react-native';
+import { StyleSheet, SafeAreaView, Platform, View } from 'react-native';
 import { Colors } from '@/constants/Colors';
 import { Header } from '@/components/app/Header';
 import { BlinkNotification } from '@/components/notifications/BlinkNotification';
@@ -23,6 +23,7 @@ export default function DashboardScreen() {
   const [showNotification, setShowNotification] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState('');
   const [notificationType, setNotificationType] = useState<'order' | 'booking' | null>(null);
+  const [webViewUrl, setWebViewUrl] = useState('https://admin.wehanda.com');
 
   useEffect(() => {
     if (!selectedRestaurant) return;
@@ -114,7 +115,8 @@ export default function DashboardScreen() {
     if (Platform.OS === 'web') {
       window.location.href = url;
     } else {
-      Linking.openURL(url);
+      // Instead of using refs with WebView, change the source URL
+      setWebViewUrl(url);
     }
   };
 
@@ -136,7 +138,7 @@ export default function DashboardScreen() {
           message={notificationMessage}
         />
         <WebView
-          source={{ uri: 'https://admin.wehanda.com' }}
+          source={{ uri: webViewUrl }}
           style={styles.webview}
         />
       </View>
