@@ -8,12 +8,7 @@
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "plugins": [
-      [
-        "expo-router",
-        {
-          "origin": "https://myapp.com"
-        }
-      ]
+      "expo-router"
     ],
     "ios": {
       "supportsTablet": true,
