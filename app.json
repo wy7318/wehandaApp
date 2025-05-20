@@ -19,7 +19,10 @@
         "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.yourcompany.boltexponativewind"
+      "package": "com.yourcompany.boltexponativewind",
+      "compileSdkVersion": 34,
+      "targetSdkVersion": 34,
+      "buildToolsVersion": "34.0.0"
     },
     "web": {
       "bundler": "metro",
