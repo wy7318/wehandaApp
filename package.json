@@ -3,6 +3,8 @@
     "dev": "expo start"
   },
   "dependencies": {
-    "date-fns": "^3.3.1"
+    "date-fns": "^3.3.1",
+    "expo": "^50.0.0",
+    "expo-cli": "^6.3.10"
   }
 }
