@@ -3,23 +3,19 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { useFonts } from 'expo-font';
-import { Poppins_400Regular, Poppins_500Medium, Poppins_600SemiBold, Poppins_700Bold } from '@expo-google-fonts/poppins';
+import { 
+  Poppins_400Regular,
+  Poppins_500Medium,
+  Poppins_600SemiBold,
+  Poppins_700Bold 
+} from '@expo-google-fonts/poppins';
 import { SplashScreen } from 'expo-router';
-import { AuthProvider } from '@/contexts/AuthContext';
-import { RestaurantProvider } from '@/contexts/RestaurantContext';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { activateKeepAwake } from 'expo-keep-awake';
 
 // Prevent splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   useFrameworkReady();
-
-  // Activate keep awake when the app starts
-  useEffect(() => {
-    activateKeepAwake();
-  }, []);
 
   const [fontsLoaded, fontError] = useFonts({
     'Poppins-Regular': Poppins_400Regular,
@@ -41,17 +37,12 @@ export default function RootLayout() {
   }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <AuthProvider>
-        <RestaurantProvider>
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-            <Stack.Screen name="(app)" options={{ headerShown: false }} />
-            <Stack.Screen name="+not-found" />
-          </Stack>
-          <StatusBar style="auto" />
-        </RestaurantProvider>
-      </AuthProvider>
-    </GestureHandlerRootView>
+    <>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="+not-found" options={{ title: 'Oops!' }} />
+      </Stack>
+      <StatusBar style="auto" />
+    </>
   );
 }
