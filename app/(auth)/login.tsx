@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, Text, Alert, Platform } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Text, Alert, Platform, Image } from 'react-native';
 import { Link, useRouter } from 'expo-router';
 import { Mail, Lock, Fingerprint } from 'lucide-react-native';
 import { AuthCard } from '@/components/auth/AuthCard';
@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Colors, Spacing } from '@/constants/Colors';
 import { useAuth } from '@/contexts/AuthContext';
 import * as LocalAuthentication from 'expo-local-authentication';
+import * as Notifications from 'expo-notifications';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -20,15 +21,27 @@ export default function LoginScreen() {
   const [showBiometrics, setShowBiometrics] = useState(false);
 
   useEffect(() => {
-    // Check if biometrics can be shown
-    const checkBiometrics = async () => {
-      if (hasBiometrics && biometricsEnabled) {
-        setShowBiometrics(true);
-      }
-    };
-    
+    requestNotificationPermission();
     checkBiometrics();
-  }, [hasBiometrics, biometricsEnabled]);
+  }, []);
+
+  const requestNotificationPermission = async () => {
+    if (Platform.OS === 'web') return;
+
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      if (status === 'granted') {
+        console.log('Notification permissions granted');
+      }
+    }
+  };
+
+  const checkBiometrics = async () => {
+    if (hasBiometrics && biometricsEnabled) {
+      setShowBiometrics(true);
+    }
+  };
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -75,9 +88,17 @@ export default function LoginScreen() {
 
   return (
     <AuthCard
-      title="Welcome Back"
+      title="Welcome to Wehanda"
       subtitle="Sign in to your account to continue"
     >
+      <View style={styles.logoContainer}>
+        <Image 
+          source={require('@/assets/images/icon.png')}
+          style={styles.logo}
+          resizeMode="contain"
+        />
+      </View>
+
       {error && (
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{error}</Text>
@@ -138,6 +159,14 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
+  logoContainer: {
+    alignItems: 'center',
+    marginBottom: Spacing.xl,
+  },
+  logo: {
+    width: 120,
+    height: 120,
+  },
   errorContainer: {
     backgroundColor: Colors.error[50],
     padding: Spacing.md,
