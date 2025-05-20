@@ -107,7 +107,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
     
     if (result.success && isMounted.current) {
-      // Store both the flag and the current session
       await SecureStore.setItemAsync(BIOMETRICS_ENABLED_KEY, 'true');
       if (session) {
         await SecureStore.setItemAsync(BIOMETRICS_SESSION_KEY, JSON.stringify(session));
@@ -145,11 +144,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       if (result.success) {
-        // Retrieve the stored session
         const storedSession = await SecureStore.getItemAsync(BIOMETRICS_SESSION_KEY);
         if (storedSession) {
           const parsedSession = JSON.parse(storedSession);
-          // Set the session in Supabase
           const { data, error } = await supabase.auth.setSession(parsedSession);
           if (error) {
             return { error };
