@@ -25,11 +25,9 @@ export const Header: React.FC<HeaderProps> = ({ showProfile = true }) => {
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.container}>
           <View style={styles.titleContainer}>
-            {selectedRestaurant ? (
-              <Text style={styles.title}>{selectedRestaurant.name}</Text>
-            ) : (
-              <Text style={styles.title}>Restaurant Manager</Text>
-            )}
+            <Text style={styles.title}>
+              {selectedRestaurant ? selectedRestaurant.name : 'Restaurant Manager'}
+            </Text>
           </View>
           
           <View style={styles.actions}>
