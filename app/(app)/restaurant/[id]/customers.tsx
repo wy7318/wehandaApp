@@ -60,7 +60,7 @@ export default function CustomersScreen() {
     try {
       const restaurantId = String(id).trim();
       const { data, error } = await supabase
-        .rpc('get_customers_by_restaurant', { restaurant_id: restaurantId });
+        .rpc('get_customers_by_restaurants', { restaurant_id: restaurantId });
       
       if (error) throw error;
       setCustomers(data || []);
