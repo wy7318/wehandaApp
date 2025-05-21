@@ -20,18 +20,22 @@ export const Header: React.FC<HeaderProps> = ({ showProfile = true }) => {
     router.push('/profile');
   };
 
+  const isRestaurantSelected = selectedRestaurant !== null;
+  const currentPath = router.pathname;
+  const isRestaurantListPage = currentPath === '/(app)';
+
   return (
     <>
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.container}>
           <View style={styles.titleContainer}>
             <Text style={styles.title}>
-              {selectedRestaurant ? selectedRestaurant.name : 'Restaurant Manager'}
+              {isRestaurantListPage ? 'Your Restaurants' : (selectedRestaurant?.name || 'Restaurant Manager')}
             </Text>
           </View>
           
           <View style={styles.actions}>
-            {selectedRestaurant && (
+            {isRestaurantSelected && !isRestaurantListPage && (
               <>
                 <TouchableOpacity
                   style={styles.iconButton}
