@@ -37,7 +37,7 @@ export default function CustomersScreen() {
       const { data, error } = await supabase
         .from('wehanda_customers')
         .select('*')
-        .contains('restaurants', [`${id}`])
+        .contains('restaurants', [id])
         .order('created_date', { ascending: false });
 
       if (error) throw error;
