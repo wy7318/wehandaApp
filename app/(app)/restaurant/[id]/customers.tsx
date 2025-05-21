@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, FlatList, TouchableOpacity, TextInput } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, FlatList, TouchableOpacity, TextInput, Modal, ScrollView } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { Header } from '@/components/app/Header';
 import { Colors, Spacing, BorderRadius } from '@/constants/Colors';
 import { supabase } from '@/lib/supabase';
-import { Search, MapPin, Phone, Mail, User as User2 } from 'lucide-react-native';
+import { Search, MapPin, Phone, Mail, User as User2, X, Calendar, ShoppingBag } from 'lucide-react-native';
 
 interface Customer {
   id: string;
@@ -15,6 +15,26 @@ interface Customer {
   country: string;
   created_date: string;
   type: string;
+  total_orders: number;
+  total_bookings: number;
+  upcoming_bookings: number;
+  lifetime_value: number;
+}
+
+interface Order {
+  id: string;
+  number: string;
+  total: number;
+  status: string;
+  created_date: string;
+}
+
+interface Booking {
+  id: string;
+  date: string;
+  time: string;
+  number_of_people: number;
+  status: string;
 }
 
 export default function CustomersScreen() {
@@ -23,6 +43,10 @@ export default function CustomersScreen() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [customerOrders, setCustomerOrders] = useState<Order[]>([]);
+  const [customerBookings, setCustomerBookings] = useState<Booking[]>([]);
+  const [loadingDetails, setLoadingDetails] = useState(false);
 
   useEffect(() => {
     fetchCustomers();
@@ -33,21 +57,50 @@ export default function CustomersScreen() {
   }, [searchQuery, customers]);
 
   const fetchCustomers = async () => {
-  try {
-    // Convert id to string to ensure proper formatting
-    const restaurantId = String(id).trim();
-    
-    const { data, error } = await supabase
-      .rpc('get_customers_by_restaurant', { restaurant_id: restaurantId });
-    
-    if (error) throw error;
-    setCustomers(data || []);
-  } catch (error) {
-    console.error('Error fetching customers:', error);
-  } finally {
-    setLoading(false);
-  }
-};
+    try {
+      const restaurantId = String(id).trim();
+      const { data, error } = await supabase
+        .rpc('get_customers_by_restaurant', { restaurant_id: restaurantId });
+      
+      if (error) throw error;
+      setCustomers(data || []);
+    } catch (error) {
+      console.error('Error fetching customers:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchCustomerDetails = async (customerId: string) => {
+    setLoadingDetails(true);
+    try {
+      // Fetch orders
+      const { data: orders, error: ordersError } = await supabase
+        .from('orders')
+        .select('id, number, total, status, created_date')
+        .eq('customer_id', customerId)
+        .eq('restaurant_id', id)
+        .order('created_date', { ascending: false });
+
+      if (ordersError) throw ordersError;
+      setCustomerOrders(orders || []);
+
+      // Fetch bookings
+      const { data: bookings, error: bookingsError } = await supabase
+        .from('bookings')
+        .select('id, date, time, number_of_people, status')
+        .eq('customer_id', customerId)
+        .eq('restaurant_id', id)
+        .order('date', { ascending: false });
+
+      if (bookingsError) throw bookingsError;
+      setCustomerBookings(bookings || []);
+    } catch (error) {
+      console.error('Error fetching customer details:', error);
+    } finally {
+      setLoadingDetails(false);
+    }
+  };
 
   const filterCustomers = () => {
     const query = searchQuery.toLowerCase();
@@ -60,8 +113,16 @@ export default function CustomersScreen() {
     setFilteredCustomers(filtered);
   };
 
+  const handleCustomerPress = (customer: Customer) => {
+    setSelectedCustomer(customer);
+    fetchCustomerDetails(customer.id);
+  };
+
   const renderCustomerCard = ({ item }: { item: Customer }) => (
-    <View style={styles.card}>
+    <TouchableOpacity 
+      style={styles.card}
+      onPress={() => handleCustomerPress(item)}
+    >
       <View style={styles.cardHeader}>
         <View style={styles.nameContainer}>
           <Text style={styles.name}>{item.name}</Text>
@@ -98,7 +159,131 @@ export default function CustomersScreen() {
           </View>
         )}
       </View>
-    </View>
+
+      <View style={styles.tagsContainer}>
+        {item.total_orders > 0 && (
+          <View style={[styles.tag, { backgroundColor: Colors.primary[50] }]}>
+            <ShoppingBag size={14} color={Colors.primary[600]} />
+            <Text style={[styles.tagText, { color: Colors.primary[600] }]}>
+              {item.total_orders} orders
+            </Text>
+          </View>
+        )}
+        {item.upcoming_bookings > 0 && (
+          <View style={[styles.tag, { backgroundColor: Colors.success[50] }]}>
+            <Calendar size={14} color={Colors.success[600]} />
+            <Text style={[styles.tagText, { color: Colors.success[600] }]}>
+              {item.upcoming_bookings} upcoming
+            </Text>
+          </View>
+        )}
+        {item.lifetime_value > 0 && (
+          <View style={[styles.tag, { backgroundColor: Colors.accent[50] }]}>
+            <Text style={[styles.tagText, { color: Colors.accent[600] }]}>
+              ${item.lifetime_value.toFixed(2)} spent
+            </Text>
+          </View>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+
+  const renderDetailsModal = () => (
+    <Modal
+      visible={selectedCustomer !== null}
+      animationType="slide"
+      onRequestClose={() => setSelectedCustomer(null)}
+    >
+      <SafeAreaView style={styles.modalContainer}>
+        <View style={styles.modalHeader}>
+          <Text style={styles.modalTitle}>Customer Details</Text>
+          <TouchableOpacity 
+            onPress={() => setSelectedCustomer(null)}
+            style={styles.closeButton}
+          >
+            <X size={24} color={Colors.neutral[500]} />
+          </TouchableOpacity>
+        </View>
+
+        {selectedCustomer && (
+          <ScrollView style={styles.modalContent}>
+            <View style={styles.customerInfo}>
+              <Text style={styles.customerName}>{selectedCustomer.name}</Text>
+              <View style={styles.customerDetails}>
+                {selectedCustomer.email && (
+                  <View style={styles.detailRow}>
+                    <Mail size={16} color={Colors.neutral[600]} />
+                    <Text style={styles.detailText}>{selectedCustomer.email}</Text>
+                  </View>
+                )}
+                {selectedCustomer.phone && (
+                  <View style={styles.detailRow}>
+                    <Phone size={16} color={Colors.neutral[600]} />
+                    <Text style={styles.detailText}>{selectedCustomer.phone}</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Orders</Text>
+              {loadingDetails ? (
+                <Text style={styles.loadingText}>Loading orders...</Text>
+              ) : customerOrders.length === 0 ? (
+                <Text style={styles.emptyText}>No orders yet</Text>
+              ) : (
+                customerOrders.map(order => (
+                  <View key={order.id} style={styles.orderCard}>
+                    <View style={styles.orderHeader}>
+                      <Text style={styles.orderNumber}>#{order.number}</Text>
+                      <View style={[styles.statusBadge, { backgroundColor: Colors.primary[50] }]}>
+                        <Text style={[styles.statusText, { color: Colors.primary[600] }]}>
+                          {order.status}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={styles.orderDetails}>
+                      <Text style={styles.orderDate}>
+                        {new Date(order.created_date).toLocaleDateString()}
+                      </Text>
+                      <Text style={styles.orderTotal}>${order.total.toFixed(2)}</Text>
+                    </View>
+                  </View>
+                ))
+              )}
+            </View>
+
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Bookings</Text>
+              {loadingDetails ? (
+                <Text style={styles.loadingText}>Loading bookings...</Text>
+              ) : customerBookings.length === 0 ? (
+                <Text style={styles.emptyText}>No bookings yet</Text>
+              ) : (
+                customerBookings.map(booking => (
+                  <View key={booking.id} style={styles.bookingCard}>
+                    <View style={styles.bookingHeader}>
+                      <Text style={styles.bookingDate}>{booking.date}</Text>
+                      <Text style={styles.bookingTime}>{booking.time}</Text>
+                    </View>
+                    <View style={styles.bookingDetails}>
+                      <Text style={styles.guestCount}>
+                        {booking.number_of_people} {booking.number_of_people === 1 ? 'guest' : 'guests'}
+                      </Text>
+                      <View style={[styles.statusBadge, { backgroundColor: Colors.success[50] }]}>
+                        <Text style={[styles.statusText, { color: Colors.success[600] }]}>
+                          {booking.status}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                ))
+              )}
+            </View>
+          </ScrollView>
+        )}
+      </SafeAreaView>
+    </Modal>
   );
 
   return (
@@ -149,6 +334,8 @@ export default function CustomersScreen() {
           />
         )}
       </View>
+
+      {renderDetailsModal()}
     </SafeAreaView>
   );
 }
@@ -263,6 +450,146 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
   },
   detailText: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 14,
+    color: Colors.neutral[600],
+  },
+  tagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.xs,
+    marginTop: Spacing.sm,
+  },
+  tag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.round,
+  },
+  tagText: {
+    fontFamily: 'Poppins-Medium',
+    fontSize: 12,
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: Spacing.md,
+    backgroundColor: Colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.neutral[200],
+  },
+  modalTitle: {
+    fontFamily: 'Poppins-Bold',
+    fontSize: 20,
+    color: Colors.neutral[900],
+  },
+  closeButton: {
+    padding: Spacing.xs,
+  },
+  modalContent: {
+    flex: 1,
+    padding: Spacing.md,
+  },
+  customerInfo: {
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  customerName: {
+    fontFamily: 'Poppins-Bold',
+    fontSize: 24,
+    color: Colors.neutral[900],
+    marginBottom: Spacing.sm,
+  },
+  customerDetails: {
+    gap: Spacing.xs,
+  },
+  section: {
+    marginBottom: Spacing.lg,
+  },
+  sectionTitle: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 18,
+    color: Colors.neutral[900],
+    marginBottom: Spacing.sm,
+  },
+  orderCard: {
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.sm,
+  },
+  orderHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.xs,
+  },
+  orderNumber: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 16,
+    color: Colors.neutral[900],
+  },
+  statusBadge: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.round,
+  },
+  statusText: {
+    fontFamily: 'Poppins-Medium',
+    fontSize: 12,
+    textTransform: 'capitalize',
+  },
+  orderDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  orderDate: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 14,
+    color: Colors.neutral[600],
+  },
+  orderTotal: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 14,
+    color: Colors.neutral[900],
+  },
+  bookingCard: {
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.sm,
+  },
+  bookingHeader: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginBottom: Spacing.xs,
+  },
+  bookingDate: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 16,
+    color: Colors.neutral[900],
+  },
+  bookingTime: {
+    fontFamily: 'Poppins-Medium',
+    fontSize: 16,
+    color: Colors.neutral[600],
+  },
+  bookingDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  guestCount: {
     fontFamily: 'Poppins-Regular',
     fontSize: 14,
     color: Colors.neutral[600],
