@@ -4,7 +4,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { Header } from '@/components/app/Header';
 import { Colors, Spacing, BorderRadius } from '@/constants/Colors';
 import { supabase } from '@/lib/supabase';
-import { Search, MapPin, Phone, Mail, User2 } from 'lucide-react-native';
+import { Search, MapPin, Phone, Mail, User as User2 } from 'lucide-react-native';
 
 interface Customer {
   id: string;
