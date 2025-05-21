@@ -40,8 +40,17 @@ export default function CustomersScreen() {
   const fetchCustomers = async () => {
     try {
       const restaurantId = String(id).trim();
+      // Get the current date
+      const today = new Date();
+      const startDate = new Date(today.getFullYear(), today.getMonth(), 1).toISOString(); // First day of current month
+      const endDate = today.toISOString(); // Current date
+      
       const { data, error } = await supabase
-        .rpc('fetch_restaurant_customer_analytics', { restaurant_id: restaurantId });
+        .rpc('fetch_restaurant_customer_analytics', { 
+          restaurant_id: restaurantId,
+          start_date: startDate,
+          end_date: endDate
+        });
       
       if (error) throw error;
       setCustomers(data || []);
