@@ -40,7 +40,7 @@ export default function CustomersScreen() {
     const { data, error } = await supabase
       .from('wehanda_customers')
       .select('*')
-      .filter(`restaurants::text LIKE '%${restaurantId}%'`) 
+      .filter('restaurants::text LIKE ?', `%${restaurantId}%`) 
       .order('created_date', { ascending: false });
     
     if (error) throw error;
