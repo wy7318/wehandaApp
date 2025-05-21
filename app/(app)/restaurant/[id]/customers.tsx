@@ -169,6 +169,14 @@ export default function CustomersScreen() {
             </Text>
           </View>
         )}
+        {item.total_bookings > 0 && (
+          <View style={[styles.tag, { backgroundColor: Colors.accent[50] }]}>
+            <Calendar size={14} color={Colors.accent[600]} />
+            <Text style={[styles.tagText, { color: Colors.accent[600] }]}>
+              {item.total_bookings} bookings
+            </Text>
+          </View>
+        )}
         {item.upcoming_bookings > 0 && (
           <View style={[styles.tag, { backgroundColor: Colors.success[50] }]}>
             <Calendar size={14} color={Colors.success[600]} />
@@ -178,8 +186,8 @@ export default function CustomersScreen() {
           </View>
         )}
         {item.lifetime_value > 0 && (
-          <View style={[styles.tag, { backgroundColor: Colors.accent[50] }]}>
-            <Text style={[styles.tagText, { color: Colors.accent[600] }]}>
+          <View style={[styles.tag, { backgroundColor: Colors.secondary[50] }]}>
+            <Text style={[styles.tagText, { color: Colors.secondary[600] }]}>
               ${item.lifetime_value.toFixed(2)} spent
             </Text>
           </View>
