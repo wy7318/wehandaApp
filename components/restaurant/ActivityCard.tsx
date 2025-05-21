@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Colors, BorderRadius, Spacing } from '@/constants/Colors';
-import { ClipboardList, LayoutDashboard, Utensils, Settings, Calendar } from 'lucide-react-native';
+import { ClipboardList, LayoutDashboard, Utensils, Settings, Calendar, Users } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { WaitlistModal } from './WaitlistModal';
 
-export type ActivityType = 'waitlist' | 'dashboard' | 'table-order' | 'settings' | 'reservations';
+export type ActivityType = 'waitlist' | 'dashboard' | 'table-order' | 'settings' | 'reservations' | 'customers';
 
 interface ActivityCardProps {
   type: ActivityType;
@@ -28,6 +28,8 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({
       setShowWaitlist(true);
     } else if (type === 'reservations') {
       router.push('/restaurant/reservations');
+    } else if (type === 'customers') {
+      router.push(`/restaurant/${restaurantId}/customers`);
     } else {
       onPress();
     }
@@ -45,6 +47,8 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({
         return <Settings size={24} color={Colors.white} />;
       case 'reservations':
         return <Calendar size={24} color={Colors.white} />;
+      case 'customers':
+        return <Users size={24} color={Colors.white} />;
     }
   };
 
@@ -60,6 +64,8 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({
         return 'Settings';
       case 'reservations':
         return 'Reservations';
+      case 'customers':
+        return 'Customers';
     }
   };
 
@@ -75,6 +81,8 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({
         return Colors.neutral[700];
       case 'reservations':
         return Colors.primary[700];
+      case 'customers':
+        return Colors.success[600];
     }
   };
 

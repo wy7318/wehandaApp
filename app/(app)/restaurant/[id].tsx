@@ -20,11 +20,11 @@ export default function RestaurantDetails() {
     }
   }, [id, userRestaurants]);
 
-  const activities: ActivityType[] = ['waitlist', 'dashboard', 'reservations', 'table-order', 'settings'];
+  const activities: ActivityType[] = ['waitlist', 'dashboard', 'reservations', 'customers', 'table-order', 'settings'];
 
   const handleActivityPress = (activityType: ActivityType) => {
-    // For this MVP, we're just showing a message for non-dashboard activities
-    if (activityType !== 'dashboard' && activityType !== 'waitlist' && activityType !== 'reservations') {
+    // For this MVP, we're just showing a message for non-implemented activities
+    if (activityType !== 'dashboard' && activityType !== 'waitlist' && activityType !== 'reservations' && activityType !== 'customers') {
       alert(`${activityType.charAt(0).toUpperCase() + activityType.slice(1).replace('-', ' ')} selected.`);
     }
   };
