@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, FlatList, TouchableOpacity, TextInput, Modal } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, FlatList, TouchableOpacity, TextInput, Modal, ScrollView } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { Header } from '@/components/app/Header';
 import { Colors, Spacing, BorderRadius } from '@/constants/Colors';
 import { supabase } from '@/lib/supabase';
-import { Search, MapPin, Phone, Mail, User as User2, X, Calendar, ShoppingBag, TrendingUp } from 'lucide-react-native';
+import { Search, MapPin, Phone, Mail, User as User2, X, Calendar, ShoppingBag } from 'lucide-react-native';
 
 interface Customer {
   id: string;
@@ -21,6 +21,22 @@ interface Customer {
   lifetime_value: number;
 }
 
+interface Order {
+  id: string;
+  number: string;
+  total: number;
+  status: string;
+  created_date: string;
+}
+
+interface Booking {
+  id: string;
+  date: string;
+  time: string;
+  number_of_people: number;
+  status: string;
+}
+
 export default function CustomersScreen() {
   const { id } = useLocalSearchParams();
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -28,6 +44,9 @@ export default function CustomersScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [customerOrders, setCustomerOrders] = useState<Order[]>([]);
+  const [customerBookings, setCustomerBookings] = useState<Booking[]>([]);
+  const [loadingDetails, setLoadingDetails] = useState(false);
 
   useEffect(() => {
     fetchCustomers();
@@ -40,25 +59,46 @@ export default function CustomersScreen() {
   const fetchCustomers = async () => {
     try {
       const restaurantId = String(id).trim();
-      // Get the current date
-      const today = new Date();
-      const startDate = new Date(today.getFullYear(), today.getMonth(), 1).toISOString(); // First day of current month
-      const endDate = today.toISOString(); // Current date
-      
       const { data, error } = await supabase
-        .rpc('fetch_restaurant_customer_analytics', { 
-          restaurant_id: restaurantId,
-          start_date: startDate,
-          end_date: endDate
-        });
+        .rpc('get_customers_by_restaurant', { restaurant_id: restaurantId });
       
       if (error) throw error;
       setCustomers(data || []);
-      setFilteredCustomers(data || []);
     } catch (error) {
       console.error('Error fetching customers:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchCustomerDetails = async (customerId: string) => {
+    setLoadingDetails(true);
+    try {
+      // Fetch orders
+      const { data: orders, error: ordersError } = await supabase
+        .from('orders')
+        .select('id, number, total, status, created_date')
+        .eq('customer_id', customerId)
+        .eq('restaurant_id', id)
+        .order('created_date', { ascending: false });
+
+      if (ordersError) throw ordersError;
+      setCustomerOrders(orders || []);
+
+      // Fetch bookings
+      const { data: bookings, error: bookingsError } = await supabase
+        .from('bookings')
+        .select('id, date, time, number_of_people, status')
+        .eq('customer_id', customerId)
+        .eq('restaurant_id', id)
+        .order('date', { ascending: false });
+
+      if (bookingsError) throw bookingsError;
+      setCustomerBookings(bookings || []);
+    } catch (error) {
+      console.error('Error fetching customer details:', error);
+    } finally {
+      setLoadingDetails(false);
     }
   };
 
@@ -75,6 +115,7 @@ export default function CustomersScreen() {
 
   const handleCustomerPress = (customer: Customer) => {
     setSelectedCustomer(customer);
+    fetchCustomerDetails(customer.id);
   };
 
   const renderCustomerCard = ({ item }: { item: Customer }) => (
@@ -85,16 +126,8 @@ export default function CustomersScreen() {
       <View style={styles.cardHeader}>
         <View style={styles.nameContainer}>
           <Text style={styles.name}>{item.name}</Text>
-          <View style={[
-            styles.typeBadge,
-            { backgroundColor: item.type === 'regular' ? Colors.success[50] : Colors.primary[50] }
-          ]}>
-            <Text style={[
-              styles.typeText,
-              { color: item.type === 'regular' ? Colors.success[600] : Colors.primary[600] }
-            ]}>
-              {item.type}
-            </Text>
+          <View style={styles.typeBadge}>
+            <Text style={styles.typeText}>{item.type}</Text>
           </View>
         </View>
         <Text style={styles.date}>
@@ -102,21 +135,155 @@ export default function CustomersScreen() {
         </Text>
       </View>
 
-      <View style={styles.statsRow}>
-        <View style={styles.statItem}>
-          <ShoppingBag size={16} color={Colors.primary[600]} />
-          <Text style={styles.statText}>{item.total_orders} orders</Text>
-        </View>
-        <View style={styles.statItem}>
-          <Calendar size={16} color={Colors.secondary[600]} />
-          <Text style={styles.statText}>{item.total_bookings} bookings</Text>
-        </View>
-        <View style={styles.statItem}>
-          <TrendingUp size={16} color={Colors.success[600]} />
-          <Text style={styles.statText}>${item.lifetime_value}</Text>
-        </View>
+      <View style={styles.detailsContainer}>
+        {item.phone && (
+          <View style={styles.detailRow}>
+            <Phone size={16} color={Colors.neutral[600]} />
+            <Text style={styles.detailText}>{item.phone}</Text>
+          </View>
+        )}
+        
+        {item.email && (
+          <View style={styles.detailRow}>
+            <Mail size={16} color={Colors.neutral[600]} />
+            <Text style={styles.detailText}>{item.email}</Text>
+          </View>
+        )}
+        
+        {(item.city || item.country) && (
+          <View style={styles.detailRow}>
+            <MapPin size={16} color={Colors.neutral[600]} />
+            <Text style={styles.detailText}>
+              {[item.city, item.country].filter(Boolean).join(', ')}
+            </Text>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.tagsContainer}>
+        {item.total_orders > 0 && (
+          <View style={[styles.tag, { backgroundColor: Colors.primary[50] }]}>
+            <ShoppingBag size={14} color={Colors.primary[600]} />
+            <Text style={[styles.tagText, { color: Colors.primary[600] }]}>
+              {item.total_orders} orders
+            </Text>
+          </View>
+        )}
+        {item.upcoming_bookings > 0 && (
+          <View style={[styles.tag, { backgroundColor: Colors.success[50] }]}>
+            <Calendar size={14} color={Colors.success[600]} />
+            <Text style={[styles.tagText, { color: Colors.success[600] }]}>
+              {item.upcoming_bookings} upcoming
+            </Text>
+          </View>
+        )}
+        {item.lifetime_value > 0 && (
+          <View style={[styles.tag, { backgroundColor: Colors.accent[50] }]}>
+            <Text style={[styles.tagText, { color: Colors.accent[600] }]}>
+              ${item.lifetime_value.toFixed(2)} spent
+            </Text>
+          </View>
+        )}
       </View>
     </TouchableOpacity>
+  );
+
+  const renderDetailsModal = () => (
+    <Modal
+      visible={selectedCustomer !== null}
+      animationType="slide"
+      onRequestClose={() => setSelectedCustomer(null)}
+    >
+      <SafeAreaView style={styles.modalContainer}>
+        <View style={styles.modalHeader}>
+          <Text style={styles.modalTitle}>Customer Details</Text>
+          <TouchableOpacity 
+            onPress={() => setSelectedCustomer(null)}
+            style={styles.closeButton}
+          >
+            <X size={24} color={Colors.neutral[500]} />
+          </TouchableOpacity>
+        </View>
+
+        {selectedCustomer && (
+          <ScrollView style={styles.modalContent}>
+            <View style={styles.customerInfo}>
+              <Text style={styles.customerName}>{selectedCustomer.name}</Text>
+              <View style={styles.customerDetails}>
+                {selectedCustomer.email && (
+                  <View style={styles.detailRow}>
+                    <Mail size={16} color={Colors.neutral[600]} />
+                    <Text style={styles.detailText}>{selectedCustomer.email}</Text>
+                  </View>
+                )}
+                {selectedCustomer.phone && (
+                  <View style={styles.detailRow}>
+                    <Phone size={16} color={Colors.neutral[600]} />
+                    <Text style={styles.detailText}>{selectedCustomer.phone}</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Orders</Text>
+              {loadingDetails ? (
+                <Text style={styles.loadingText}>Loading orders...</Text>
+              ) : customerOrders.length === 0 ? (
+                <Text style={styles.emptyText}>No orders yet</Text>
+              ) : (
+                customerOrders.map(order => (
+                  <View key={order.id} style={styles.orderCard}>
+                    <View style={styles.orderHeader}>
+                      <Text style={styles.orderNumber}>#{order.number}</Text>
+                      <View style={[styles.statusBadge, { backgroundColor: Colors.primary[50] }]}>
+                        <Text style={[styles.statusText, { color: Colors.primary[600] }]}>
+                          {order.status}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={styles.orderDetails}>
+                      <Text style={styles.orderDate}>
+                        {new Date(order.created_date).toLocaleDateString()}
+                      </Text>
+                      <Text style={styles.orderTotal}>${order.total.toFixed(2)}</Text>
+                    </View>
+                  </View>
+                ))
+              )}
+            </View>
+
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Bookings</Text>
+              {loadingDetails ? (
+                <Text style={styles.loadingText}>Loading bookings...</Text>
+              ) : customerBookings.length === 0 ? (
+                <Text style={styles.emptyText}>No bookings yet</Text>
+              ) : (
+                customerBookings.map(booking => (
+                  <View key={booking.id} style={styles.bookingCard}>
+                    <View style={styles.bookingHeader}>
+                      <Text style={styles.bookingDate}>{booking.date}</Text>
+                      <Text style={styles.bookingTime}>{booking.time}</Text>
+                    </View>
+                    <View style={styles.bookingDetails}>
+                      <Text style={styles.guestCount}>
+                        {booking.number_of_people} {booking.number_of_people === 1 ? 'guest' : 'guests'}
+                      </Text>
+                      <View style={[styles.statusBadge, { backgroundColor: Colors.success[50] }]}>
+                        <Text style={[styles.statusText, { color: Colors.success[600] }]}>
+                          {booking.status}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                ))
+              )}
+            </View>
+          </ScrollView>
+        )}
+      </SafeAreaView>
+    </Modal>
   );
 
   return (
@@ -161,91 +328,14 @@ export default function CustomersScreen() {
           <FlatList
             data={filteredCustomers}
             renderItem={renderCustomerCard}
-            keyExtractor={(item) => item.id}
+            keyExtractor={item => item.id}
             contentContainerStyle={styles.listContainer}
             showsVerticalScrollIndicator={false}
           />
         )}
       </View>
 
-      <Modal
-        visible={selectedCustomer !== null}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setSelectedCustomer(null)}
-      >
-        {selectedCustomer && (
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Customer Details</Text>
-                <TouchableOpacity
-                  onPress={() => setSelectedCustomer(null)}
-                  style={styles.closeButton}
-                >
-                  <X size={24} color={Colors.neutral[500]} />
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.modalBody}>
-                <View style={styles.detailSection}>
-                  <Text style={styles.sectionTitle}>Contact Information</Text>
-                  <View style={styles.detailsContainer}>
-                    {selectedCustomer.phone && (
-                      <View style={styles.detailRow}>
-                        <Phone size={16} color={Colors.neutral[600]} />
-                        <Text style={styles.detailText}>{selectedCustomer.phone}</Text>
-                      </View>
-                    )}
-                    
-                    {selectedCustomer.email && (
-                      <View style={styles.detailRow}>
-                        <Mail size={16} color={Colors.neutral[600]} />
-                        <Text style={styles.detailText}>{selectedCustomer.email}</Text>
-                      </View>
-                    )}
-                    
-                    {(selectedCustomer.city || selectedCustomer.country) && (
-                      <View style={styles.detailRow}>
-                        <MapPin size={16} color={Colors.neutral[600]} />
-                        <Text style={styles.detailText}>
-                          {[selectedCustomer.city, selectedCustomer.country].filter(Boolean).join(', ')}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                </View>
-
-                <View style={styles.detailSection}>
-                  <Text style={styles.sectionTitle}>Activity Overview</Text>
-                  <View style={styles.activityGrid}>
-                    <View style={styles.activityCard}>
-                      <ShoppingBag size={24} color={Colors.primary[600]} />
-                      <Text style={styles.activityNumber}>{selectedCustomer.total_orders}</Text>
-                      <Text style={styles.activityLabel}>Total Orders</Text>
-                    </View>
-                    <View style={styles.activityCard}>
-                      <Calendar size={24} color={Colors.secondary[600]} />
-                      <Text style={styles.activityNumber}>{selectedCustomer.total_bookings}</Text>
-                      <Text style={styles.activityLabel}>Total Bookings</Text>
-                    </View>
-                    <View style={styles.activityCard}>
-                      <Calendar size={24} color={Colors.accent[600]} />
-                      <Text style={styles.activityNumber}>{selectedCustomer.upcoming_bookings}</Text>
-                      <Text style={styles.activityLabel}>Upcoming</Text>
-                    </View>
-                    <View style={styles.activityCard}>
-                      <TrendingUp size={24} color={Colors.success[600]} />
-                      <Text style={styles.activityNumber}>${selectedCustomer.lifetime_value}</Text>
-                      <Text style={styles.activityLabel}>Lifetime Value</Text>
-                    </View>
-                  </View>
-                </View>
-              </View>
-            </View>
-          </View>
-        )}
-      </Modal>
+      {renderDetailsModal()}
     </SafeAreaView>
   );
 }
@@ -335,6 +425,7 @@ const styles = StyleSheet.create({
     color: Colors.neutral[900],
   },
   typeBadge: {
+    backgroundColor: Colors.primary[50],
     paddingHorizontal: Spacing.sm,
     paddingVertical: 2,
     borderRadius: BorderRadius.round,
@@ -342,27 +433,13 @@ const styles = StyleSheet.create({
   typeText: {
     fontFamily: 'Poppins-Medium',
     fontSize: 12,
+    color: Colors.primary[600],
     textTransform: 'capitalize',
   },
   date: {
     fontFamily: 'Poppins-Regular',
     fontSize: 12,
     color: Colors.neutral[500],
-  },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: Spacing.sm,
-  },
-  statItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-  },
-  statText: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 14,
-    color: Colors.neutral[600],
   },
   detailsContainer: {
     gap: Spacing.xs,
@@ -373,6 +450,146 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
   },
   detailText: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 14,
+    color: Colors.neutral[600],
+  },
+  tagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.xs,
+    marginTop: Spacing.sm,
+  },
+  tag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.round,
+  },
+  tagText: {
+    fontFamily: 'Poppins-Medium',
+    fontSize: 12,
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: Spacing.md,
+    backgroundColor: Colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.neutral[200],
+  },
+  modalTitle: {
+    fontFamily: 'Poppins-Bold',
+    fontSize: 20,
+    color: Colors.neutral[900],
+  },
+  closeButton: {
+    padding: Spacing.xs,
+  },
+  modalContent: {
+    flex: 1,
+    padding: Spacing.md,
+  },
+  customerInfo: {
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  customerName: {
+    fontFamily: 'Poppins-Bold',
+    fontSize: 24,
+    color: Colors.neutral[900],
+    marginBottom: Spacing.sm,
+  },
+  customerDetails: {
+    gap: Spacing.xs,
+  },
+  section: {
+    marginBottom: Spacing.lg,
+  },
+  sectionTitle: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 18,
+    color: Colors.neutral[900],
+    marginBottom: Spacing.sm,
+  },
+  orderCard: {
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.sm,
+  },
+  orderHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.xs,
+  },
+  orderNumber: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 16,
+    color: Colors.neutral[900],
+  },
+  statusBadge: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.round,
+  },
+  statusText: {
+    fontFamily: 'Poppins-Medium',
+    fontSize: 12,
+    textTransform: 'capitalize',
+  },
+  orderDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  orderDate: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 14,
+    color: Colors.neutral[600],
+  },
+  orderTotal: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 14,
+    color: Colors.neutral[900],
+  },
+  bookingCard: {
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.sm,
+  },
+  bookingHeader: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginBottom: Spacing.xs,
+  },
+  bookingDate: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 16,
+    color: Colors.neutral[900],
+  },
+  bookingTime: {
+    fontFamily: 'Poppins-Medium',
+    fontSize: 16,
+    color: Colors.neutral[600],
+  },
+  bookingDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  guestCount: {
     fontFamily: 'Poppins-Regular',
     fontSize: 14,
     color: Colors.neutral[600],
@@ -395,74 +612,5 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     paddingBottom: Spacing.xl,
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: Colors.background,
-    borderTopLeftRadius: BorderRadius.xl,
-    borderTopRightRadius: BorderRadius.xl,
-    maxHeight: '80%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.neutral[200],
-  },
-  modalTitle: {
-    fontFamily: 'Poppins-Bold',
-    fontSize: 20,
-    color: Colors.neutral[900],
-  },
-  closeButton: {
-    padding: Spacing.sm,
-  },
-  modalBody: {
-    padding: Spacing.md,
-  },
-  detailSection: {
-    marginBottom: Spacing.lg,
-  },
-  sectionTitle: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 16,
-    color: Colors.neutral[800],
-    marginBottom: Spacing.sm,
-  },
-  activityGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
-  },
-  activityCard: {
-    flex: 1,
-    minWidth: '45%',
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
-    alignItems: 'center',
-    shadowColor: Colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  activityNumber: {
-    fontFamily: 'Poppins-Bold',
-    fontSize: 20,
-    color: Colors.neutral[900],
-    marginTop: Spacing.xs,
-  },
-  activityLabel: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 12,
-    color: Colors.neutral[600],
-    marginTop: 2,
   },
 });
