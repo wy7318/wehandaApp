@@ -33,21 +33,21 @@ export default function CustomersScreen() {
   }, [searchQuery, customers]);
 
   const fetchCustomers = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('wehanda_customers')
-        .select('*')
-        .filter('restaurants::jsonb @> ?', JSON.stringify([id]))
-        .order('created_date', { ascending: false });
-
-      if (error) throw error;
-      setCustomers(data || []);
-    } catch (error) {
-      console.error('Error fetching customers:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  try {
+    const { data, error } = await supabase
+      .from('wehanda_customers')
+      .select('*')
+      .filter('restaurants::jsonb @> ?', JSON.stringify([id]))
+      .order('created_date', { ascending: false });
+    
+    if (error) throw error;
+    setCustomers(data || []);
+  } catch (error) {
+    console.error('Error fetching customers:', error);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const filterCustomers = () => {
     const query = searchQuery.toLowerCase();
