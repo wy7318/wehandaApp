@@ -1,10 +1,11 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Platform } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Platform, Modal } from 'react-native';
 import { Colors, Spacing } from '@/constants/Colors';
-import { User } from 'lucide-react-native';
+import { User, Calendar } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useRestaurant } from '@/contexts/RestaurantContext';
 import { NotificationBell } from '../notifications/NotificationBell';
+import { ReservationCalendar } from '../restaurant/ReservationCalendar';
 
 interface HeaderProps {
   showProfile?: boolean;
@@ -13,37 +14,69 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({ showProfile = true }) => {
   const router = useRouter();
   const { selectedRestaurant } = useRestaurant();
+  const [showCalendar, setShowCalendar] = useState(false);
 
   const handleProfilePress = () => {
     router.push('/profile');
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        <View style={styles.titleContainer}>
-          {selectedRestaurant ? (
-            <Text style={styles.title}>{selectedRestaurant.name}</Text>
-          ) : (
-            <Text style={styles.title}>Restaurant Manager</Text>
-          )}
+    <>
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.container}>
+          <View style={styles.titleContainer}>
+            {selectedRestaurant ? (
+              <Text style={styles.title}>{selectedRestaurant.name}</Text>
+            ) : (
+              <Text style={styles.title}>Restaurant Manager</Text>
+            )}
+          </View>
+          
+          <View style={styles.actions}>
+            {selectedRestaurant && (
+              <>
+                <TouchableOpacity
+                  style={styles.iconButton}
+                  onPress={() => setShowCalendar(true)}
+                >
+                  <Calendar size={24} color={Colors.neutral[800]} />
+                </TouchableOpacity>
+                <NotificationBell restaurantId={selectedRestaurant.id} />
+              </>
+            )}
+            {showProfile && (
+              <TouchableOpacity
+                style={styles.profileButton}
+                onPress={handleProfilePress}
+              >
+                <User size={24} color={Colors.neutral[800]} />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
-        
-        <View style={styles.actions}>
-          {selectedRestaurant && (
-            <NotificationBell restaurantId={selectedRestaurant.id} />
-          )}
-          {showProfile && (
-            <TouchableOpacity
-              style={styles.profileButton}
-              onPress={handleProfilePress}
+      </SafeAreaView>
+
+      <Modal
+        visible={showCalendar}
+        animationType="slide"
+        onRequestClose={() => setShowCalendar(false)}
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Reservations</Text>
+            <TouchableOpacity 
+              style={styles.closeButton}
+              onPress={() => setShowCalendar(false)}
             >
-              <User size={24} color={Colors.neutral[800]} />
+              <Text style={styles.closeButtonText}>Close</Text>
             </TouchableOpacity>
+          </View>
+          {selectedRestaurant && (
+            <ReservationCalendar restaurantId={selectedRestaurant.id} />
           )}
-        </View>
-      </View>
-    </SafeAreaView>
+        </SafeAreaView>
+      </Modal>
+    </>
   );
 };
 
@@ -72,10 +105,42 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  iconButton: {
+    padding: Spacing.xs,
+    borderRadius: 999,
+    backgroundColor: Colors.neutral[200],
   },
   profileButton: {
     padding: Spacing.xs,
     borderRadius: 999,
     backgroundColor: Colors.neutral[200],
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: Spacing.md,
+    backgroundColor: Colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.neutral[200],
+  },
+  modalTitle: {
+    fontFamily: 'Poppins-Bold',
+    fontSize: 20,
+    color: Colors.neutral[900],
+  },
+  closeButton: {
+    padding: Spacing.sm,
+  },
+  closeButtonText: {
+    fontFamily: 'Poppins-Medium',
+    fontSize: 16,
+    color: Colors.primary[600],
   },
 });
