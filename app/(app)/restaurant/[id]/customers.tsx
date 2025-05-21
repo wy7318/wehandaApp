@@ -38,13 +38,12 @@ export default function CustomersScreen() {
     const restaurantId = String(id).trim();
     
     const { data, error } = await supabase
-      .from('wehanda_customers')
-      .select('*')
-      .filter('restaurants::text LIKE ?', `%${restaurantId}%`) 
-      .order('created_date', { ascending: false });
+      .rpc('get_customers_by_restaurant', { restaurant_id: restaurantId });
     
     if (error) throw error;
     setCustomers(data || []);
+  } catch (error) {
+    console.error('Error fetching customers:', error);
   } finally {
     setLoading(false);
   }
