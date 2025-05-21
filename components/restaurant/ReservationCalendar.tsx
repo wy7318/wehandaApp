@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { Colors, Spacing, BorderRadius } from '@/constants/Colors';
 import { supabase } from '@/lib/supabase';
-import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from 'date-fns';
+import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths } from 'date-fns';
+import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 
 interface Booking {
   id: string;
@@ -22,18 +23,19 @@ interface ReservationCalendarProps {
 
 export const ReservationCalendar: React.FC<ReservationCalendarProps> = ({ restaurantId }) => {
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [currentMonth, setCurrentMonth] = useState(new Date());
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchBookings();
-  }, [restaurantId, selectedDate]);
+  }, [restaurantId, currentMonth]);
 
   const fetchBookings = async () => {
     try {
-      const startDate = startOfMonth(selectedDate);
-      const endDate = endOfMonth(selectedDate);
+      const startDate = startOfMonth(currentMonth);
+      const endDate = endOfMonth(currentMonth);
 
       const { data, error } = await supabase
         .from('bookings')
@@ -68,8 +70,8 @@ export const ReservationCalendar: React.FC<ReservationCalendarProps> = ({ restau
 
   const getDaysInMonth = () => {
     return eachDayOfInterval({
-      start: startOfMonth(selectedDate),
-      end: endOfMonth(selectedDate)
+      start: startOfMonth(currentMonth),
+      end: endOfMonth(currentMonth)
     });
   };
 
@@ -77,6 +79,14 @@ export const ReservationCalendar: React.FC<ReservationCalendarProps> = ({ restau
     return bookings.filter(booking => 
       isSameDay(parseISO(booking.date), date)
     );
+  };
+
+  const handlePreviousMonth = () => {
+    setCurrentMonth(prev => subMonths(prev, 1));
+  };
+
+  const handleNextMonth = () => {
+    setCurrentMonth(prev => addMonths(prev, 1));
   };
 
   const renderDayCell = (date: Date) => {
@@ -154,9 +164,23 @@ export const ReservationCalendar: React.FC<ReservationCalendarProps> = ({ restau
       <Text style={styles.title}>Reservations Calendar</Text>
       
       <View style={styles.calendar}>
-        <Text style={styles.monthHeader}>
-          {format(selectedDate, 'MMMM yyyy')}
-        </Text>
+        <View style={styles.monthHeader}>
+          <TouchableOpacity 
+            style={styles.monthButton} 
+            onPress={handlePreviousMonth}
+          >
+            <ChevronLeft size={24} color={Colors.neutral[600]} />
+          </TouchableOpacity>
+          <Text style={styles.monthTitle}>
+            {format(currentMonth, 'MMMM yyyy')}
+          </Text>
+          <TouchableOpacity 
+            style={styles.monthButton} 
+            onPress={handleNextMonth}
+          >
+            <ChevronRight size={24} color={Colors.neutral[600]} />
+          </TouchableOpacity>
+        </View>
         <View style={styles.daysGrid}>
           {getDaysInMonth().map(date => renderDayCell(date))}
         </View>
@@ -187,11 +211,20 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   monthHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.md,
+  },
+  monthButton: {
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.round,
+    backgroundColor: Colors.neutral[100],
+  },
+  monthTitle: {
     fontFamily: 'Poppins-SemiBold',
     fontSize: 18,
     color: Colors.neutral[900],
-    marginBottom: Spacing.md,
-    textAlign: 'center',
   },
   daysGrid: {
     flexDirection: 'row',
