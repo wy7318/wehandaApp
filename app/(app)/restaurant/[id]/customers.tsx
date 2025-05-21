@@ -34,16 +34,17 @@ export default function CustomersScreen() {
 
   const fetchCustomers = async () => {
   try {
+    // Convert id to string to ensure proper formatting
+    const restaurantId = String(id).trim();
+    
     const { data, error } = await supabase
       .from('wehanda_customers')
       .select('*')
-      .contains('restaurants', [`${id}`]) // Explicitly convert to string in array
+      .filter(`restaurants::text LIKE '%${restaurantId}%'`) 
       .order('created_date', { ascending: false });
     
     if (error) throw error;
     setCustomers(data || []);
-  } catch (error) {
-    console.error('Error fetching customers:', error);
   } finally {
     setLoading(false);
   }
