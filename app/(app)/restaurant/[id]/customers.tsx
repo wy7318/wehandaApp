@@ -37,7 +37,7 @@ export default function CustomersScreen() {
     const { data, error } = await supabase
       .from('wehanda_customers')
       .select('*')
-      .filter('restaurants::jsonb @> ?', JSON.stringify([id]))
+      .contains('restaurants', [`${id}`]) // Explicitly convert to string in array
       .order('created_date', { ascending: false });
     
     if (error) throw error;
