@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Colors, BorderRadius, Spacing } from '@/constants/Colors';
-import { LineChart, BarChart } from 'lucide-react-native';
+import { ChartLine as LineChart, ChartBar as BarChart } from 'lucide-react-native';
 
 interface AnalyticsCardProps {
   type: 'demand' | 'revenue';
