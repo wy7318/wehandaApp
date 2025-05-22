@@ -1,4 +1,3 @@
-// app/(app)/restaurant/[id].tsx
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, FlatList } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -14,7 +13,6 @@ export default function RestaurantDetails() {
   const router = useRouter();
   const { userRestaurants, selectRestaurant, selectedRestaurant } = useRestaurant();
   const [showAnalytics, setShowAnalytics] = useState(false);
-  const [analyticsType, setAnalyticsType] = useState<'demand' | 'revenue'>('demand');
 
   useEffect(() => {
     // Find and select the restaurant by ID
@@ -29,18 +27,13 @@ export default function RestaurantDetails() {
     'dashboard',
     'reservations',
     'customers',
-    'demand-analytics',
-    'revenue-analytics',
+    'analytics',
     'table-order',
     'settings'
   ];
 
   const handleActivityPress = (activityType: ActivityType) => {
-    if (activityType === 'demand-analytics') {
-      setAnalyticsType('demand');
-      setShowAnalytics(true);
-    } else if (activityType === 'revenue-analytics') {
-      setAnalyticsType('revenue');
+    if (activityType === 'analytics') {
       setShowAnalytics(true);
     } else if (activityType !== 'dashboard' && activityType !== 'waitlist' && activityType !== 'reservations' && activityType !== 'customers') {
       alert(`${activityType.charAt(0).toUpperCase() + activityType.slice(1).replace('-', ' ')} selected.`);
@@ -85,7 +78,6 @@ export default function RestaurantDetails() {
           visible={showAnalytics}
           onClose={() => setShowAnalytics(false)}
           restaurantId={selectedRestaurant.id}
-          type={analyticsType}
         />
       </View>
     </SafeAreaView>
