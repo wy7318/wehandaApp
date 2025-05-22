@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Modal, SafeAreaView, TouchableOpacity, ScrollView, Platform } from 'react-native';
 import { Colors, BorderRadius, Spacing } from '@/constants/Colors';
-import { X, TrendingUp, TrendingDown, AlertCircle } from 'lucide-react-native';
+import { X, TrendingUp, TrendingDown, CircleAlert as AlertCircle } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { format, subDays, subWeeks } from 'date-fns';
 
