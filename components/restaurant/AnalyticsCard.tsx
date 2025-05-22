@@ -1,63 +1,121 @@
-import React from 'react';
+// components/restaurant/ActivityCard.tsx
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Colors, BorderRadius, Spacing } from '@/constants/Colors';
-import { ChartLine as LineChart, ChartBar as BarChart } from 'lucide-react-native';
+import { ClipboardList, LayoutDashboard, Utensils, Settings, Calendar, Users, ChartLine, ChartBar } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import { WaitlistModal } from './WaitlistModal';
 
-interface AnalyticsCardProps {
-  type: 'demand' | 'revenue';
+export type ActivityType = 'waitlist' | 'dashboard' | 'table-order' | 'settings' | 'reservations' | 'customers' | 'demand-analytics' | 'revenue-analytics';
+
+interface ActivityCardProps {
+  type: ActivityType;
   onPress: () => void;
+  restaurantId: string;
 }
 
-export const AnalyticsCard: React.FC<AnalyticsCardProps> = ({
+export const ActivityCard: React.FC<ActivityCardProps> = ({
   type,
   onPress,
+  restaurantId,
 }) => {
-  const getIcon = () => {
-    switch (type) {
-      case 'demand':
-        return <BarChart size={24} color={Colors.white} />;
-      case 'revenue':
-        return <LineChart size={24} color={Colors.white} />;
+  const router = useRouter();
+  const [showWaitlist, setShowWaitlist] = useState(false);
+
+  const handlePress = () => {
+    if (type === 'dashboard') {
+      router.push('/restaurant/dashboard');
+    } else if (type === 'waitlist') {
+      setShowWaitlist(true);
+    } else if (type === 'reservations') {
+      router.push('/restaurant/reservations');
+    } else if (type === 'customers') {
+      router.push(`/restaurant/${restaurantId}/customers`);
+    } else {
+      onPress();
     }
   };
 
-  const getTitle = () => {
+  const getActivityIcon = () => {
     switch (type) {
-      case 'demand':
-        return 'Demand Forecast';
-      case 'revenue':
-        return 'Revenue Forecast';
+      case 'waitlist':
+        return <ClipboardList size={24} color={Colors.white} />;
+      case 'dashboard':
+        return <LayoutDashboard size={24} color={Colors.white} />;
+      case 'table-order':
+        return <Utensils size={24} color={Colors.white} />;
+      case 'settings':
+        return <Settings size={24} color={Colors.white} />;
+      case 'reservations':
+        return <Calendar size={24} color={Colors.white} />;
+      case 'customers':
+        return <Users size={24} color={Colors.white} />;
+      case 'demand-analytics':
+        return <ChartBar size={24} color={Colors.white} />;
+      case 'revenue-analytics':
+        return <ChartLine size={24} color={Colors.white} />;
     }
   };
 
-  const getDescription = () => {
+  const getActivityTitle = () => {
     switch (type) {
-      case 'demand':
-        return 'Predict order volumes using historical data';
-      case 'revenue':
-        return 'Weekly/monthly revenue predictions';
+      case 'waitlist':
+        return 'Waitlist';
+      case 'dashboard':
+        return 'Dashboard';
+      case 'table-order':
+        return 'Table Order';
+      case 'settings':
+        return 'Settings';
+      case 'reservations':
+        return 'Reservations';
+      case 'customers':
+        return 'Customers';
+      case 'demand-analytics':
+        return 'Demand Analytics';
+      case 'revenue-analytics':
+        return 'Revenue Analytics';
     }
   };
 
-  const getColor = () => {
+  const getActivityColor = () => {
     switch (type) {
-      case 'demand':
+      case 'waitlist':
+        return Colors.accent[600];
+      case 'dashboard':
         return Colors.primary[600];
-      case 'revenue':
+      case 'table-order':
+        return Colors.secondary[600];
+      case 'settings':
+        return Colors.neutral[700];
+      case 'reservations':
+        return Colors.primary[700];
+      case 'customers':
+        return Colors.success[600];
+      case 'demand-analytics':
+        return Colors.primary[600];
+      case 'revenue-analytics':
         return Colors.success[600];
     }
   };
 
   return (
-    <TouchableOpacity
-      style={[styles.container, { backgroundColor: getColor() }]}
-      onPress={onPress}
-      activeOpacity={0.8}
-    >
-      <View style={styles.iconContainer}>{getIcon()}</View>
-      <Text style={styles.title}>{getTitle()}</Text>
-      <Text style={styles.description}>{getDescription()}</Text>
-    </TouchableOpacity>
+    <>
+      <TouchableOpacity
+        style={[styles.container, { backgroundColor: getActivityColor() }]}
+        onPress={handlePress}
+        activeOpacity={0.8}
+      >
+        <View style={styles.iconContainer}>{getActivityIcon()}</View>
+        <Text style={styles.title}>{getActivityTitle()}</Text>
+      </TouchableOpacity>
+
+      <WaitlistModal
+        visible={showWaitlist}
+        onClose={() => setShowWaitlist(false)}
+        restaurantId={restaurantId}
+      />
+    </>
   );
 };
 
@@ -84,13 +142,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Colors.white,
     textAlign: 'center',
-    marginBottom: Spacing.xs,
-  },
-  description: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 12,
-    color: Colors.white,
-    textAlign: 'center',
-    opacity: 0.9,
   },
 });
