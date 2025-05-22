@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Modal, SafeAreaView, TouchableOpacity, ScrollView, Platform } from 'react-native';
+import { View, Text, StyleSheet, Modal, SafeAreaView, TouchableOpacity, ScrollView, Platform, Dimensions } from 'react-native';
 import { Colors, BorderRadius, Spacing } from '@/constants/Colors';
 import { X, TrendingUp, TrendingDown, CircleAlert as AlertCircle } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { format, subDays, subWeeks } from 'date-fns';
+import { LineChart, BarChart } from 'react-native-chart-kit';
 
 interface AnalyticsModalProps {
   visible: boolean;
   onClose: () => void;
   restaurantId: string;
-  type: 'demand' | 'revenue';
 }
 
 interface ForecastData {
@@ -26,22 +26,26 @@ interface Stats {
   growth: number;
 }
 
+type AnalyticsType = 'demand' | 'revenue';
+
+const screenWidth = Dimensions.get('window').width;
+
 export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
   visible,
   onClose,
   restaurantId,
-  type,
 }) => {
   const [loading, setLoading] = useState(true);
   const [forecast, setForecast] = useState<ForecastData[]>([]);
   const [weeklyStats, setWeeklyStats] = useState<Stats[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [selectedType, setSelectedType] = useState<AnalyticsType>('demand');
 
   useEffect(() => {
     if (visible) {
       fetchData();
     }
-  }, [visible, restaurantId, type]);
+  }, [visible, restaurantId, selectedType]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -50,7 +54,7 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
     try {
       // Get forecast data
       const { data: forecastData, error: forecastError } = await supabase.rpc(
-        type === 'demand' ? 'get_demand_forecast' : 'get_revenue_forecast',
+        selectedType === 'demand' ? 'get_demand_forecast' : 'get_revenue_forecast',
         {
           p_restaurant_id: restaurantId,
           p_periods: 4
@@ -75,8 +79,8 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
       setWeeklyStats(
         (statsData || []).map((stat: any) => ({
           date: stat.week,
-          value: type === 'demand' ? stat.order_count : stat.total_revenue,
-          growth: type === 'demand' ? stat.week_over_week_growth : stat.revenue_growth
+          value: selectedType === 'demand' ? stat.order_count : stat.total_revenue,
+          growth: selectedType === 'demand' ? stat.week_over_week_growth : stat.revenue_growth
         }))
       );
     } catch (err: any) {
@@ -86,64 +90,63 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
     }
   };
 
-  const renderForecastCard = (data: ForecastData) => {
-    // Add default values to prevent undefined errors
-    const forecastedValue = data.forecasted_value || 0;
-    const lowerBound = data.lower_bound || 0;
-    const upperBound = data.upper_bound || 0;
-    
-    const value = type === 'demand' ? 
-      Math.round(forecastedValue) :
-      forecastedValue.toFixed(2);
-    
-    const range = type === 'demand' ?
-      `${Math.round(lowerBound)} - ${Math.round(upperBound)}` :
-      `$${lowerBound.toFixed(2)} - $${upperBound.toFixed(2)}`;
+  const renderCharts = () => {
+    if (!weeklyStats.length) return null;
+
+    const chartConfig = {
+      backgroundColor: Colors.white,
+      backgroundGradientFrom: Colors.white,
+      backgroundGradientTo: Colors.white,
+      decimalPlaces: selectedType === 'demand' ? 0 : 2,
+      color: (opacity = 1) => `rgba(106, 76, 147, ${opacity})`,
+      labelColor: (opacity = 1) => Colors.neutral[700],
+      style: {
+        borderRadius: 16,
+      },
+      propsForDots: {
+        r: "6",
+        strokeWidth: "2",
+        stroke: Colors.primary[600]
+      }
+    };
+
+    const lineData = {
+      labels: weeklyStats.slice(-6).map(stat => format(new Date(stat.date), 'MMM d')),
+      datasets: [{
+        data: weeklyStats.slice(-6).map(stat => stat.value),
+        color: (opacity = 1) => Colors.primary[600],
+        strokeWidth: 2
+      }]
+    };
+
+    const barData = {
+      labels: forecast.map(f => format(new Date(f.forecast_date), 'MMM d')),
+      datasets: [{
+        data: forecast.map(f => f.forecasted_value)
+      }]
+    };
 
     return (
-      <View style={styles.forecastCard} key={data.forecast_date}>
-        <Text style={styles.forecastDate}>
-          {format(new Date(data.forecast_date), 'MMM d, yyyy')}
-        </Text>
-        <Text style={styles.forecastValue}>
-          {type === 'demand' ? value : `$${value}`}
-        </Text>
-        <Text style={styles.forecastRange}>
-          Range: {range}
-        </Text>
-        <Text style={styles.confidenceLevel}>
-          {data.confidence_level || 0}% Confidence
-        </Text>
-      </View>
-    );
-  };
+      <View style={styles.chartsContainer}>
+        <Text style={styles.chartTitle}>Historical {selectedType === 'demand' ? 'Orders' : 'Revenue'}</Text>
+        <LineChart
+          data={lineData}
+          width={screenWidth - 40}
+          height={220}
+          chartConfig={chartConfig}
+          bezier
+          style={styles.chart}
+        />
 
-  const renderStatsCard = (stat: Stats) => {
-    const isPositive = (stat.growth || 0) > 0;
-    const growthColor = isPositive ? Colors.success[600] : Colors.error[600];
-    const value = stat.value || 0;
-    const growth = stat.growth || 0;
-
-    return (
-      <View style={styles.statsCard} key={stat.date}>
-        <Text style={styles.statsDate}>
-          {format(new Date(stat.date), 'MMM d, yyyy')}
-        </Text>
-        <Text style={styles.statsValue}>
-          {type === 'demand' ? 
-            `${Math.round(value)} orders` :
-            `$${value.toFixed(2)}`}
-        </Text>
-        <View style={styles.growthContainer}>
-          {isPositive ? (
-            <TrendingUp size={16} color={growthColor} />
-          ) : (
-            <TrendingDown size={16} color={growthColor} />
-          )}
-          <Text style={[styles.growthText, { color: growthColor }]}>
-            {Math.abs(growth).toFixed(1)}%
-          </Text>
-        </View>
+        <Text style={styles.chartTitle}>Forecasted {selectedType === 'demand' ? 'Orders' : 'Revenue'}</Text>
+        <BarChart
+          data={barData}
+          width={screenWidth - 40}
+          height={220}
+          chartConfig={chartConfig}
+          style={styles.chart}
+          showValuesOnTopOfBars
+        />
       </View>
     );
   };
@@ -158,11 +161,28 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
       <SafeAreaView style={styles.modalContainer}>
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>
-              {type === 'demand' ? 'Demand Forecast' : 'Revenue Forecast'}
-            </Text>
+            <Text style={styles.modalTitle}>Analytics Dashboard</Text>
             <TouchableOpacity onPress={onClose}>
               <X size={24} color={Colors.neutral[500]} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.tabContainer}>
+            <TouchableOpacity
+              style={[styles.tab, selectedType === 'demand' && styles.selectedTab]}
+              onPress={() => setSelectedType('demand')}
+            >
+              <Text style={[styles.tabText, selectedType === 'demand' && styles.selectedTabText]}>
+                Demand
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tab, selectedType === 'revenue' && styles.selectedTab]}
+              onPress={() => setSelectedType('revenue')}
+            >
+              <Text style={[styles.tabText, selectedType === 'revenue' && styles.selectedTabText]}>
+                Revenue
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -173,22 +193,38 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
             </View>
           ) : loading ? (
             <View style={styles.loadingContainer}>
-              <Text style={styles.loadingText}>Loading forecasts...</Text>
+              <Text style={styles.loadingText}>Loading analytics...</Text>
             </View>
           ) : (
             <ScrollView style={styles.scrollContent}>
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Forecast</Text>
-                <View style={styles.forecastGrid}>
-                  {forecast.map(renderForecastCard)}
-                </View>
-              </View>
-
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Historical Performance</Text>
-                <View style={styles.statsGrid}>
-                  {weeklyStats.map(renderStatsCard)}
-                </View>
+              {renderCharts()}
+              
+              <View style={styles.statsGrid}>
+                {weeklyStats.slice(-4).map((stat, index) => (
+                  <View style={styles.statsCard} key={index}>
+                    <Text style={styles.statsDate}>
+                      {format(new Date(stat.date), 'MMM d, yyyy')}
+                    </Text>
+                    <Text style={styles.statsValue}>
+                      {selectedType === 'demand' ? 
+                        `${Math.round(stat.value)} orders` :
+                        `$${stat.value.toFixed(2)}`}
+                    </Text>
+                    <View style={styles.growthContainer}>
+                      {stat.growth > 0 ? (
+                        <TrendingUp size={16} color={Colors.success[600]} />
+                      ) : (
+                        <TrendingDown size={16} color={Colors.error[600]} />
+                      )}
+                      <Text style={[
+                        styles.growthText,
+                        { color: stat.growth > 0 ? Colors.success[600] : Colors.error[600] }
+                      ]}>
+                        {Math.abs(stat.growth).toFixed(1)}%
+                      </Text>
+                    </View>
+                  </View>
+                ))}
               </View>
             </ScrollView>
           )}
@@ -223,57 +259,46 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: Colors.neutral[900],
   },
+  tabContainer: {
+    flexDirection: 'row',
+    padding: Spacing.md,
+    gap: Spacing.sm,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.neutral[100],
+    alignItems: 'center',
+  },
+  selectedTab: {
+    backgroundColor: Colors.primary[600],
+  },
+  tabText: {
+    fontFamily: 'Poppins-Medium',
+    fontSize: 14,
+    color: Colors.neutral[700],
+  },
+  selectedTabText: {
+    color: Colors.white,
+  },
   scrollContent: {
     flex: 1,
     padding: Spacing.md,
   },
-  section: {
+  chartsContainer: {
     marginBottom: Spacing.xl,
   },
-  sectionTitle: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 18,
-    color: Colors.neutral[900],
-    marginBottom: Spacing.md,
-  },
-  forecastGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.md,
-  },
-  forecastCard: {
-    backgroundColor: Colors.white,
+  chart: {
+    marginVertical: Spacing.md,
     borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
-    width: '48%',
-    shadowColor: Colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
   },
-  forecastDate: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 14,
-    color: Colors.neutral[600],
-    marginBottom: 4,
-  },
-  forecastValue: {
-    fontFamily: 'Poppins-Bold',
-    fontSize: 20,
-    color: Colors.primary[600],
-    marginBottom: 4,
-  },
-  forecastRange: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 12,
-    color: Colors.neutral[500],
-    marginBottom: 2,
-  },
-  confidenceLevel: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 12,
-    color: Colors.success[600],
+  chartTitle: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 16,
+    color: Colors.neutral[900],
+    marginBottom: Spacing.sm,
   },
   statsGrid: {
     gap: Spacing.md,
@@ -282,9 +307,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     borderRadius: BorderRadius.lg,
     padding: Spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     shadowColor: Colors.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -295,21 +317,17 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-Medium',
     fontSize: 14,
     color: Colors.neutral[600],
-    flex: 1,
   },
   statsValue: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 16,
+    fontFamily: 'Poppins-Bold',
+    fontSize: 20,
     color: Colors.neutral[900],
-    flex: 1,
-    textAlign: 'center',
+    marginVertical: Spacing.xs,
   },
   growthContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    flex: 1,
-    justifyContent: 'flex-end',
   },
   growthText: {
     fontFamily: 'Poppins-Medium',
