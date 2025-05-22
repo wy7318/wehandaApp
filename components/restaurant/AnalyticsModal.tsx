@@ -71,9 +71,9 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
 
       if (statsError) throw statsError;
 
-      setForecast(forecastData);
+      setForecast(forecastData || []);
       setWeeklyStats(
-        statsData.map((stat: any) => ({
+        (statsData || []).map((stat: any) => ({
           date: stat.week,
           value: type === 'demand' ? stat.order_count : stat.total_revenue,
           growth: type === 'demand' ? stat.week_over_week_growth : stat.revenue_growth
@@ -87,13 +87,18 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
   };
 
   const renderForecastCard = (data: ForecastData) => {
+    // Add default values to prevent undefined errors
+    const forecastedValue = data.forecasted_value || 0;
+    const lowerBound = data.lower_bound || 0;
+    const upperBound = data.upper_bound || 0;
+    
     const value = type === 'demand' ? 
-      Math.round(data.forecasted_value) :
-      data.forecasted_value.toFixed(2);
+      Math.round(forecastedValue) :
+      forecastedValue.toFixed(2);
     
     const range = type === 'demand' ?
-      `${Math.round(data.lower_bound)} - ${Math.round(data.upper_bound)}` :
-      `$${data.lower_bound.toFixed(2)} - $${data.upper_bound.toFixed(2)}`;
+      `${Math.round(lowerBound)} - ${Math.round(upperBound)}` :
+      `$${lowerBound.toFixed(2)} - $${upperBound.toFixed(2)}`;
 
     return (
       <View style={styles.forecastCard} key={data.forecast_date}>
@@ -107,15 +112,17 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
           Range: {range}
         </Text>
         <Text style={styles.confidenceLevel}>
-          {data.confidence_level}% Confidence
+          {data.confidence_level || 0}% Confidence
         </Text>
       </View>
     );
   };
 
   const renderStatsCard = (stat: Stats) => {
-    const isPositive = stat.growth > 0;
+    const isPositive = (stat.growth || 0) > 0;
     const growthColor = isPositive ? Colors.success[600] : Colors.error[600];
+    const value = stat.value || 0;
+    const growth = stat.growth || 0;
 
     return (
       <View style={styles.statsCard} key={stat.date}>
@@ -124,8 +131,8 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
         </Text>
         <Text style={styles.statsValue}>
           {type === 'demand' ? 
-            `${Math.round(stat.value)} orders` :
-            `$${stat.value.toFixed(2)}`}
+            `${Math.round(value)} orders` :
+            `$${value.toFixed(2)}`}
         </Text>
         <View style={styles.growthContainer}>
           {isPositive ? (
@@ -134,7 +141,7 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
             <TrendingDown size={16} color={growthColor} />
           )}
           <Text style={[styles.growthText, { color: growthColor }]}>
-            {Math.abs(stat.growth).toFixed(1)}%
+            {Math.abs(growth).toFixed(1)}%
           </Text>
         </View>
       </View>
