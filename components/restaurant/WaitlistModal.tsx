@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, SafeAreaView, ScrollView, Platform, KeyboardAvoidingView } from 'react-native';
 import { X } from 'lucide-react-native';
 import { Colors, BorderRadius, Spacing } from '@/constants/Colors';
 import { CustomerWaitlist } from './CustomerWaitlist';
@@ -28,7 +28,7 @@ export const WaitlistModal: React.FC<WaitlistModalProps> = ({
     switch (view) {
       case 'select':
         return (
-          <View style={styles.selectContainer}>
+          <ScrollView style={styles.selectContainer} contentContainerStyle={styles.selectContentContainer}>
             <TouchableOpacity
               style={styles.optionButton}
               onPress={() => setView('customer')}
@@ -44,7 +44,7 @@ export const WaitlistModal: React.FC<WaitlistModalProps> = ({
               <Text style={styles.optionButtonText}>Restaurant</Text>
               <Text style={styles.optionButtonSubtext}>Manage waitlist</Text>
             </TouchableOpacity>
-          </View>
+          </ScrollView>
         );
 
       case 'customer':
@@ -62,23 +62,31 @@ export const WaitlistModal: React.FC<WaitlistModalProps> = ({
       transparent={true}
       onRequestClose={onClose}
     >
-      <View style={styles.modalContainer}>
-        <SafeAreaView style={styles.modalContent}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Waitlist</Text>
-            <TouchableOpacity onPress={onClose}>
-              <X size={24} color={Colors.neutral[500]} />
-            </TouchableOpacity>
-          </View>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardView}
+      >
+        <View style={styles.modalContainer}>
+          <SafeAreaView style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Waitlist</Text>
+              <TouchableOpacity onPress={onClose}>
+                <X size={24} color={Colors.neutral[500]} />
+              </TouchableOpacity>
+            </View>
 
-          {renderContent()}
-        </SafeAreaView>
-      </View>
+            {renderContent()}
+          </SafeAreaView>
+        </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
+  keyboardView: {
+    flex: 1,
+  },
   modalContainer: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -86,7 +94,7 @@ const styles = StyleSheet.create({
   modalContent: {
     flex: 1,
     backgroundColor: Colors.background,
-    marginTop: 60,
+    marginTop: Platform.OS === 'ios' ? 0 : 60,
     borderTopLeftRadius: BorderRadius.xl,
     borderTopRightRadius: BorderRadius.xl,
   },
@@ -104,8 +112,12 @@ const styles = StyleSheet.create({
     color: Colors.neutral[900],
   },
   selectContainer: {
+    flex: 1,
+  },
+  selectContentContainer: {
     padding: Spacing.md,
     gap: Spacing.md,
+    minHeight: '100%',
   },
   optionButton: {
     backgroundColor: Colors.white,
