@@ -57,7 +57,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ restaurantId
             subtitle: `Order #${newOrder.number}`,
             timestamp: new Date(newOrder.created_date),
           };
-
+          
           addNotification(notification);
 
           // Show native notification on mobile
@@ -96,7 +96,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ restaurantId
             subtitle: `${newBooking.number_of_people} people at ${newBooking.time}`,
             timestamp: new Date(newBooking.created_date),
           };
-
+          
           addNotification(notification);
 
           // Show native notification on mobile

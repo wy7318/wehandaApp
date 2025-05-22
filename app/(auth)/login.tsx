@@ -13,7 +13,7 @@ import * as Notifications from 'expo-notifications';
 export default function LoginScreen() {
   const router = useRouter();
   const { signIn, signInWithBiometrics, hasBiometrics, biometricsEnabled } = useAuth();
-
+  
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -48,13 +48,13 @@ export default function LoginScreen() {
       setError('Email and password are required');
       return;
     }
-
+    
     setError(null);
     setIsLoading(true);
-
+    
     try {
       const { error } = await signIn(email, password);
-
+      
       if (error) {
         setError(error.message);
       } else {
@@ -70,10 +70,10 @@ export default function LoginScreen() {
   const handleBiometricAuth = async () => {
     setError(null);
     setIsLoading(true);
-
+    
     try {
       const { error } = await signInWithBiometrics();
-
+      
       if (error) {
         setError(error.message);
       } else {
@@ -92,7 +92,7 @@ export default function LoginScreen() {
       subtitle="Sign in to your account to continue"
     >
       <View style={styles.logoContainer}>
-        <Image
+        <Image 
           source={require('@/assets/images/icon.png')}
           style={styles.logo}
           resizeMode="contain"
@@ -104,7 +104,7 @@ export default function LoginScreen() {
           <Text style={styles.errorText}>{error}</Text>
         </View>
       )}
-
+      
       <Input
         label="Email"
         placeholder="Enter your email"
@@ -114,7 +114,7 @@ export default function LoginScreen() {
         keyboardType="email-address"
         leftIcon={<Mail size={20} color={Colors.neutral[500]} />}
       />
-
+      
       <Input
         label="Password"
         placeholder="Enter your password"
@@ -124,7 +124,7 @@ export default function LoginScreen() {
         showPasswordToggle
         leftIcon={<Lock size={20} color={Colors.neutral[500]} />}
       />
-
+      
       <Button
         title="Sign In"
         onPress={handleLogin}
@@ -132,7 +132,7 @@ export default function LoginScreen() {
         fullWidth
         style={styles.loginButton}
       />
-
+      
       {showBiometrics && (
         <TouchableOpacity
           style={styles.biometricsButton}
@@ -145,7 +145,7 @@ export default function LoginScreen() {
           </Text>
         </TouchableOpacity>
       )}
-
+      
       <View style={styles.footer}>
         <Text style={styles.footerText}>Don't have an account? </Text>
         <Link href="/register" asChild>

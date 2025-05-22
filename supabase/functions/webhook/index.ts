@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
       .upsert({
         id: customer._id,
         organisation_id: customer.organisation_id,
-        name: customer.details?.name || customer.name, // Handle both order and booking customer formats
+        name: customer.details?.name || customer.name,
         phone: customer.details?.phone || customer.phone,
         email: customer.details?.email || customer.email,
         zip: customer.zip || '',
@@ -85,7 +85,7 @@ Deno.serve(async (req) => {
     if (customerError) throw customerError;
 
     // Handle different webhook types
-    if (webhookData.event === 'booking_new') {
+    if (webhookData.event === 'booking_new' || webhookData.event === 'booking_update_status') {
       const booking = webhookData.data.booking;
       const { error: bookingError } = await supabaseClient
         .from('bookings')
@@ -102,7 +102,7 @@ Deno.serve(async (req) => {
           timestamp: booking.config.timestamp,
           number_of_people: booking.config.number_of_people,
           created_date: new Date(booking.created).toISOString(),
-          modified_date: new Date().toISOString()
+          modified_date: new Date(booking.updated || booking.created).toISOString()
         }, {
           onConflict: 'id'
         });
