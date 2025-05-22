@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, SafeAreaView } from 'react-native';
 import { Colors, Spacing, BorderRadius } from '@/constants/Colors';
 import { supabase } from '@/lib/supabase';
 import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths } from 'date-fns';
@@ -160,43 +160,52 @@ export const ReservationCalendar: React.FC<ReservationCalendarProps> = ({ restau
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Reservations Calendar</Text>
-      
-      <View style={styles.calendar}>
-        <View style={styles.monthHeader}>
-          <TouchableOpacity 
-            style={styles.monthButton} 
-            onPress={handlePreviousMonth}
-          >
-            <ChevronLeft size={24} color={Colors.neutral[600]} />
-          </TouchableOpacity>
-          <Text style={styles.monthTitle}>
-            {format(currentMonth, 'MMMM yyyy')}
-          </Text>
-          <TouchableOpacity 
-            style={styles.monthButton} 
-            onPress={handleNextMonth}
-          >
-            <ChevronRight size={24} color={Colors.neutral[600]} />
-          </TouchableOpacity>
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+        <Text style={styles.title}>Reservations Calendar</Text>
+        
+        <View style={styles.calendar}>
+          <View style={styles.monthHeader}>
+            <TouchableOpacity 
+              style={styles.monthButton} 
+              onPress={handlePreviousMonth}
+            >
+              <ChevronLeft size={24} color={Colors.neutral[600]} />
+            </TouchableOpacity>
+            <Text style={styles.monthTitle}>
+              {format(currentMonth, 'MMMM yyyy')}
+            </Text>
+            <TouchableOpacity 
+              style={styles.monthButton} 
+              onPress={handleNextMonth}
+            >
+              <ChevronRight size={24} color={Colors.neutral[600]} />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.daysGrid}>
+            {getDaysInMonth().map(date => renderDayCell(date))}
+          </View>
         </View>
-        <View style={styles.daysGrid}>
-          {getDaysInMonth().map(date => renderDayCell(date))}
-        </View>
-      </View>
 
-      <ScrollView style={styles.bookingList}>
-        {renderBookingDetails()}
+        <ScrollView style={styles.bookingList}>
+          {renderBookingDetails()}
+        </ScrollView>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
   container: {
     flex: 1,
+  },
+  contentContainer: {
     padding: Spacing.md,
+    minHeight: '100%',
   },
   title: {
     fontFamily: 'Poppins-Bold',
