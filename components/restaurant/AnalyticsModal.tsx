@@ -29,6 +29,7 @@ interface Stats {
 type AnalyticsType = 'demand' | 'revenue';
 
 const screenWidth = Dimensions.get('window').width;
+const DEFAULT_CHART_HEIGHT = 220;
 
 export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
   visible,
@@ -91,7 +92,7 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
   };
 
   const renderCharts = () => {
-    if (!weeklyStats.length) return null;
+    if (!weeklyStats.length || !forecast.length) return null;
 
     const chartConfig = {
       backgroundColor: Colors.white,
@@ -113,7 +114,7 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
     const lineData = {
       labels: weeklyStats.slice(-6).map(stat => format(new Date(stat.date), 'MMM d')),
       datasets: [{
-        data: weeklyStats.slice(-6).map(stat => stat.value),
+        data: weeklyStats.slice(-6).map(stat => stat.value || 0), // Ensure no undefined values
         color: (opacity = 1) => Colors.primary[600],
         strokeWidth: 2
       }]
@@ -122,7 +123,7 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
     const barData = {
       labels: forecast.map(f => format(new Date(f.forecast_date), 'MMM d')),
       datasets: [{
-        data: forecast.map(f => f.forecasted_value)
+        data: forecast.map(f => f.forecasted_value || 0) // Ensure no undefined values
       }]
     };
 
@@ -132,7 +133,7 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
         <LineChart
           data={lineData}
           width={screenWidth - 40}
-          height={220}
+          height={DEFAULT_CHART_HEIGHT}
           chartConfig={chartConfig}
           bezier
           style={styles.chart}
@@ -142,7 +143,7 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
         <BarChart
           data={barData}
           width={screenWidth - 40}
-          height={220}
+          height={DEFAULT_CHART_HEIGHT}
           chartConfig={chartConfig}
           style={styles.chart}
           showValuesOnTopOfBars
