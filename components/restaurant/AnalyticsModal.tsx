@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Modal, SafeAreaView, TouchableOpacity, ScrollView, Platform, Dimensions } from 'react-native';
 import { Colors, BorderRadius, Spacing } from '@/constants/Colors';
-import { X, TrendingUp, TrendingDown, CircleAlert as AlertCircle, Calendar, DollarSign, Users } from 'lucide-react-native';
+import { X, TrendingUp, TrendingDown, CircleAlert as AlertCircle, Calendar, DollarSign, Users, ShoppingBag } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { format, subDays, subWeeks, subMonths, subYears } from 'date-fns';
 import { LineChart, BarChart } from 'react-native-chart-kit';
