@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Alert, Modal, Platform } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { View, Text, StyleSheet, SafeAreaView, FlatList, TouchableOpacity, Dimensions, Modal, Alert, Platform, ScrollView } from 'react-native';
 import { Header } from '@/components/app/Header';
 import { Colors, Spacing, BorderRadius } from '@/constants/Colors';
 import { supabase } from '@/lib/supabase';
+import { useLocalSearchParams } from 'expo-router';
+import { DollarSign, Gift, Percent, ShoppingBag, Clock, Calendar, X, Check, TrendingUp, Coins, Camera, ChevronRight, Users, ChartBar as BarChart } from 'lucide-react-native';
+import { GestureHandlerRootView, Swipeable, RectButton } from 'react-native-gesture-handler';
 import { Button } from '@/components/ui/Button';
-import { Coins, X, ChevronRight, TrendingUp, TrendingDown } from 'lucide-react-native';
-import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
+import { CameraView } from 'expo-camera';
 
 interface MarketingCampaign {
+  id?: string;
   name: string;
   description: string;
   type: 'amount_off' | 'percentage_off' | 'free_item' | 'bogo';
@@ -18,53 +20,77 @@ interface MarketingCampaign {
   max_redemptions?: number;
   start_date?: string;
   end_date?: string;
+  status?: 'draft' | 'active' | 'paused' | 'expired' | 'cancelled';
   expected_revenue: number;
 }
 
 interface Restaurant {
   id: string;
-  name: string;
   marketing_tokens: number;
   marketing_enabled: boolean;
 }
 
+const { width } = Dimensions.get('window');
+const SWIPE_THRESHOLD = 120;
+
 export default function MarketingScreen() {
   const { id } = useLocalSearchParams();
-  const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
+  const [campaigns, setCampaigns] = useState<MarketingCampaign[]>([]);
   const [suggestedCampaigns, setSuggestedCampaigns] = useState<MarketingCampaign[]>([]);
-  const [selectedCampaign, setSelectedCampaign] = useState<MarketingCampaign | null>(null);
+  const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showScanner, setShowScanner] = useState(false);
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [selectedCampaign, setSelectedCampaign] = useState<MarketingCampaign | null>(null);
 
   useEffect(() => {
+    if (Platform.OS !== 'web') {
+      checkPermissions();
+    }
     fetchRestaurantData();
-    fetchSuggestedCampaigns();
   }, [id]);
+
+  const checkPermissions = async () => {
+    const { status } = await Camera.requestCameraPermissionsAsync();
+    setHasPermission(status === 'granted');
+  };
 
   const fetchRestaurantData = async () => {
     try {
-      const { data, error } = await supabase
+      const { data: restaurantData, error: restaurantError } = await supabase
         .from('restaurants')
-        .select('id, name, marketing_tokens, marketing_enabled')
+        .select('*')
         .eq('id', id)
         .single();
 
-      if (error) throw error;
-      setRestaurant(data);
-    } catch (err: any) {
-      setError(err.message);
-    }
-  };
+      if (restaurantError) throw restaurantError;
+      setRestaurant(restaurantData);
 
-  const fetchSuggestedCampaigns = async () => {
-    try {
-      const { data, error } = await supabase.rpc('generate_suggested_campaigns', {
-        p_restaurant_id: id,
-        p_count: 3
-      });
+      if (!restaurantData.marketing_enabled) {
+        setError('Marketing features are not enabled for this restaurant');
+        return;
+      }
 
-      if (error) throw error;
-      setSuggestedCampaigns(data || []);
+      const { data: campaignData, error: campaignError } = await supabase
+        .from('marketing_campaigns')
+        .select('*')
+        .eq('restaurant_id', id)
+        .order('created_at', { ascending: false });
+
+      if (campaignError) throw campaignError;
+      setCampaigns(campaignData || []);
+
+      if (restaurantData.marketing_tokens > 0) {
+        const { data: suggestedData, error: suggestedError } = await supabase
+          .rpc('generate_suggested_campaigns', { 
+            p_restaurant_id: id,
+            p_count: 3
+          });
+
+        if (suggestedError) throw suggestedError;
+        setSuggestedCampaigns(suggestedData || []);
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -72,127 +98,100 @@ export default function MarketingScreen() {
     }
   };
 
-  const handleAccept = async (campaign: MarketingCampaign) => {
-    if (!restaurant) return;
+  const handleApprove = async (campaign: MarketingCampaign) => {
+    if (!restaurant || restaurant.marketing_tokens <= 0) {
+      Alert.alert('Error', 'No marketing tokens available');
+      return;
+    }
 
     try {
-      const { error } = await supabase
+      const { error: tokenError } = await supabase
+        .from('restaurants')
+        .update({ marketing_tokens: restaurant.marketing_tokens - 1 })
+        .eq('id', id);
+
+      if (tokenError) throw tokenError;
+
+      const { error: campaignError } = await supabase
         .from('marketing_campaigns')
         .insert({
+          ...campaign,
           restaurant_id: id,
-          name: campaign.name,
-          description: campaign.description,
-          type: campaign.type,
-          discount_value: campaign.discount_value,
-          free_item_name: campaign.free_item_name,
-          period_type: campaign.period_type,
-          max_redemptions: campaign.max_redemptions,
-          start_date: campaign.start_date,
-          end_date: campaign.end_date,
-          status: 'active',
-          expected_revenue: campaign.expected_revenue
+          status: 'active'
         });
 
-      if (error) throw error;
+      if (campaignError) throw campaignError;
 
-      // Remove accepted campaign from suggestions
-      setSuggestedCampaigns(prev => prev.filter(c => c.name !== campaign.name));
-      setSelectedCampaign(null);
-
-      Alert.alert('Success', 'Campaign created successfully!');
+      fetchRestaurantData();
     } catch (err: any) {
       setError(err.message);
     }
   };
 
   const handleDecline = async (campaign: MarketingCampaign) => {
-    if (!restaurant) return;
+    if (!campaign.id) {
+      const updatedSuggestions = suggestedCampaigns.filter(c => c.name !== campaign.name);
+      setSuggestedCampaigns(updatedSuggestions);
+      return;
+    }
 
     try {
-      // Deduct token and get new suggestion
-      const { data, error } = await supabase.rpc(
-        'deduct_marketing_tokens',
-        {
-          p_restaurant_id: id,
-          p_amount: 1,
-          p_reason: `Declined campaign: ${campaign.name}`,
-          p_generate_suggestion: true
-        }
-      );
+      const { error } = await supabase
+        .from('marketing_campaigns')
+        .update({ status: 'cancelled' })
+        .eq('id', campaign.id);
 
       if (error) throw error;
-
-      if (!data.success) {
-        Alert.alert('Error', 'Insufficient marketing tokens');
-        return;
-      }
-
-      // Remove declined campaign and add new suggestion
-      const updatedSuggestions = suggestedCampaigns.filter(c => c.name !== campaign.name);
-      if (data.new_suggestion) {
-        updatedSuggestions.push(data.new_suggestion);
-      }
-      setSuggestedCampaigns(updatedSuggestions);
-
-      // Update restaurant tokens
-      setRestaurant(prev => prev ? {
-        ...prev,
-        marketing_tokens: prev.marketing_tokens - 1
-      } : null);
-
-      // Close modal if open
-      setSelectedCampaign(null);
+      fetchRestaurantData();
     } catch (err: any) {
       setError(err.message);
     }
   };
 
-  const renderCampaignCard = (campaign: MarketingCampaign) => {
-    const renderSwipeableActions = (progress: any, dragX: any) => {
-      return (
-        <>
-          <TouchableOpacity
-            style={[styles.swipeAction, styles.acceptAction]}
-            onPress={() => handleAccept(campaign)}
-          >
-            <Text style={styles.swipeActionText}>Accept</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.swipeAction, styles.declineAction]}
-            onPress={() => handleDecline(campaign)}
-          >
-            <Text style={styles.swipeActionText}>Decline</Text>
-          </TouchableOpacity>
-        </>
-      );
-    };
+  const handleScanCode = async ({ data }: { data: string }) => {
+    try {
+      const { data: redemption, error } = await supabase
+        .rpc('redeem_marketing_coupon', {
+          p_code: data,
+          p_order_id: null,
+          p_total_bill: 0
+        });
 
-    return (
-      <Swipeable renderRightActions={renderSwipeableActions}>
-        <TouchableOpacity
-          style={styles.campaignCard}
-          onPress={() => setSelectedCampaign(campaign)}
-        >
-          <View style={styles.campaignHeader}>
-            <Text style={styles.campaignName}>{campaign.name}</Text>
-            <ChevronRight size={20} color={Colors.neutral[400]} />
-          </View>
-          <Text style={styles.campaignDescription}>{campaign.description}</Text>
-          <View style={styles.campaignStats}>
-            <View style={styles.statItem}>
-              <Text style={styles.statLabel}>Expected Revenue</Text>
-              <Text style={styles.statValue}>${campaign.expected_revenue.toFixed(2)}</Text>
-            </View>
-            {campaign.max_redemptions && (
-              <View style={styles.statItem}>
-                <Text style={styles.statLabel}>Max Redemptions</Text>
-                <Text style={styles.statValue}>{campaign.max_redemptions}</Text>
-              </View>
-            )}
-          </View>
-        </TouchableOpacity>
-      </Swipeable>
-    );
+      if (error) throw error;
+
+      Alert.alert('Success', `Coupon redeemed: ${redemption.campaign_name}`);
+      setShowScanner(false);
+    } catch (err: any) {
+      Alert.alert('Error', err.message);
+    }
+  };
+
+  const renderCampaignIcon = (type: string) => {
+    switch (type) {
+      case 'amount_off':
+        return <DollarSign size={24} color={Colors.primary[600]} />;
+      case 'percentage_off':
+        return <Percent size={24} color={Colors.accent[600]} />;
+      case 'free_item':
+        return <Gift size={24} color={Colors.success[600]} />;
+      case 'bogo':
+        return <ShoppingBag size={24} color={Colors.secondary[600]} />;
+      default:
+        return null;
+    }
+  };
+
+  const renderPeriodIcon = (type: string) => {
+    switch (type) {
+      case 'limited_number':
+        return <ShoppingBag size={20} color={Colors.neutral[600]} />;
+      case 'date_range':
+        return <Calendar size={20} color={Colors.neutral[600]} />;
+      case 'unlimited':
+        return <Clock size={20} color={Colors.neutral[600]} />;
+      default:
+        return null;
+    }
   };
 
   const renderCampaignDetails = () => {
@@ -202,127 +201,296 @@ export default function MarketingScreen() {
       <Modal
         visible={!!selectedCampaign}
         animationType="slide"
-        transparent={true}
         onRequestClose={() => setSelectedCampaign(null)}
       >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Campaign Details</Text>
-              <TouchableOpacity onPress={() => setSelectedCampaign(null)}>
-                <X size={24} color={Colors.neutral[500]} />
-              </TouchableOpacity>
-            </View>
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Campaign Details</Text>
+            <TouchableOpacity onPress={() => setSelectedCampaign(null)}>
+              <X size={24} color={Colors.neutral[500]} />
+            </TouchableOpacity>
+          </View>
 
-            <ScrollView style={styles.modalBody}>
-              <Text style={styles.detailTitle}>{selectedCampaign.name}</Text>
-              <Text style={styles.detailDescription}>{selectedCampaign.description}</Text>
+          <ScrollView style={styles.modalContent}>
+            <View style={styles.modalCard}>
+              <View style={styles.modalIconContainer}>
+                {renderCampaignIcon(selectedCampaign.type)}
+              </View>
+              <Text style={styles.modalCampaignName}>{selectedCampaign.name}</Text>
+              <Text style={styles.modalDescription}>{selectedCampaign.description}</Text>
 
-              <View style={styles.detailSection}>
-                <Text style={styles.sectionTitle}>Campaign Type</Text>
-                <View style={styles.typeTag}>
-                  <Text style={styles.typeText}>
-                    {selectedCampaign.type.replace('_', ' ').toUpperCase()}
+              <View style={styles.statsGrid}>
+                <View style={styles.statCard}>
+                  <Users size={20} color={Colors.primary[600]} />
+                  <Text style={styles.statValue}>
+                    {selectedCampaign.max_redemptions || 'Unlimited'}
+                  </Text>
+                  <Text style={styles.statLabel}>Max Uses</Text>
+                </View>
+
+                <View style={styles.statCard}>
+                  <BarChart size={20} color={Colors.success[600]} />
+                  <Text style={styles.statValue}>
+                    ${selectedCampaign.expected_revenue.toFixed(2)}
+                  </Text>
+                  <Text style={styles.statLabel}>Expected Revenue</Text>
+                </View>
+              </View>
+
+              <View style={styles.detailsList}>
+                <View style={styles.detailItem}>
+                  <Text style={styles.detailLabel}>Type</Text>
+                  <Text style={styles.detailValue}>
+                    {selectedCampaign.type.split('_').map(word => 
+                      word.charAt(0).toUpperCase() + word.slice(1)
+                    ).join(' ')}
+                  </Text>
+                </View>
+
+                <View style={styles.detailItem}>
+                  <Text style={styles.detailLabel}>Value</Text>
+                  <Text style={styles.detailValue}>
+                    {selectedCampaign.type === 'amount_off' && `$${selectedCampaign.discount_value.toFixed(2)} off`}
+                    {selectedCampaign.type === 'percentage_off' && `${selectedCampaign.discount_value}% off`}
+                    {selectedCampaign.type === 'free_item' && `Free ${selectedCampaign.free_item_name}`}
+                    {selectedCampaign.type === 'bogo' && 'Buy One Get One Free'}
+                  </Text>
+                </View>
+
+                <View style={styles.detailItem}>
+                  <Text style={styles.detailLabel}>Period</Text>
+                  <Text style={styles.detailValue}>
+                    {selectedCampaign.period_type === 'limited_number' 
+                      ? `${selectedCampaign.max_redemptions} redemptions`
+                      : selectedCampaign.period_type === 'date_range'
+                      ? `Until ${new Date(selectedCampaign.end_date!).toLocaleDateString()}`
+                      : 'Unlimited'}
                   </Text>
                 </View>
               </View>
 
-              <View style={styles.detailSection}>
-                <Text style={styles.sectionTitle}>Expected Performance</Text>
-                <View style={styles.performanceCard}>
-                  <View style={styles.performanceItem}>
-                    <TrendingUp size={24} color={Colors.success[600]} />
-                    <Text style={styles.performanceLabel}>Expected Revenue</Text>
-                    <Text style={styles.performanceValue}>
-                      ${selectedCampaign.expected_revenue.toFixed(2)}
-                    </Text>
-                  </View>
-                  {selectedCampaign.max_redemptions && (
-                    <View style={styles.performanceItem}>
-                      <TrendingDown size={24} color={Colors.primary[600]} />
-                      <Text style={styles.performanceLabel}>Max Redemptions</Text>
-                      <Text style={styles.performanceValue}>
-                        {selectedCampaign.max_redemptions}
-                      </Text>
-                    </View>
-                  )}
+              {!selectedCampaign.id && (
+                <View style={styles.modalActions}>
+                  <Button
+                    title="Decline"
+                    variant="outline"
+                    onPress={() => {
+                      handleDecline(selectedCampaign);
+                      setSelectedCampaign(null);
+                    }}
+                    style={styles.modalActionButton}
+                  />
+                  <Button
+                    title="Approve"
+                    onPress={() => {
+                      handleApprove(selectedCampaign);
+                      setSelectedCampaign(null);
+                    }}
+                    style={styles.modalActionButton}
+                  />
                 </View>
-              </View>
-
-              <View style={styles.detailSection}>
-                <Text style={styles.sectionTitle}>Campaign Period</Text>
-                <Text style={styles.periodText}>
-                  {selectedCampaign.period_type === 'date_range'
-                    ? `${new Date(selectedCampaign.start_date!).toLocaleDateString()} - ${new Date(selectedCampaign.end_date!).toLocaleDateString()}`
-                    : selectedCampaign.period_type === 'limited_number'
-                    ? `Limited to ${selectedCampaign.max_redemptions} redemptions`
-                    : 'Unlimited period'}
-                </Text>
-              </View>
-
-              <View style={styles.buttonContainer}>
-                <Button
-                  title="Accept Campaign"
-                  onPress={() => handleAccept(selectedCampaign)}
-                  style={styles.acceptButton}
-                />
-                <Button
-                  title="Decline Campaign"
-                  variant="outline"
-                  onPress={() => handleDecline(selectedCampaign)}
-                  style={styles.declineButton}
-                />
-              </View>
-            </ScrollView>
-          </View>
-        </View>
+              )}
+            </View>
+          </ScrollView>
+        </SafeAreaView>
       </Modal>
     );
   };
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <Header />
-      
-      <View style={styles.content}>
-        {restaurant && (
-          <View style={styles.tokenContainer}>
-            <Coins size={24} color={Colors.primary[600]} />
-            <Text style={styles.tokenCount}>
-              {restaurant.marketing_tokens} Marketing Tokens
+  const renderSwipeableCard = ({ item }: { item: MarketingCampaign }) => {
+    const cardContent = (
+      <TouchableOpacity
+        onPress={() => setSelectedCampaign(item)}
+        activeOpacity={0.7}
+        style={styles.cardTouchable}
+      >
+        <View style={styles.cardHeader}>
+          {renderCampaignIcon(item.type)}
+          <View style={styles.headerContent}>
+            <Text style={styles.campaignName}>{item.name}</Text>
+            <View style={styles.statusContainer}>
+              <Text style={[
+                styles.statusText,
+                { color: item.status === 'active' ? Colors.success[600] : Colors.neutral[600] }
+              ]}>
+                {item.status ? item.status.charAt(0).toUpperCase() + item.status.slice(1) : 'Suggested'}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        <Text style={styles.description}>{item.description}</Text>
+
+        <View style={styles.detailsContainer}>
+          <View style={styles.detail}>
+            {renderPeriodIcon(item.period_type)}
+            <Text style={styles.detailText}>
+              {item.period_type === 'limited_number'
+                ? `${item.max_redemptions} redemptions`
+                : item.period_type === 'date_range'
+                ? `Until ${new Date(item.end_date!).toLocaleDateString()}`
+                : 'Unlimited'}
             </Text>
           </View>
-        )}
 
-        <Text style={styles.title}>Suggested Campaigns</Text>
+          <View style={styles.detail}>
+            <TrendingUp size={20} color={Colors.neutral[600]} />
+            <Text style={styles.detailText}>
+              ${item.expected_revenue.toFixed(2)} expected
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.valueContainer}>
+          {item.type === 'amount_off' && (
+            <Text style={styles.valueText}>
+              ${item.discount_value.toFixed(2)} off
+            </Text>
+          )}
+          {item.type === 'percentage_off' && (
+            <Text style={styles.valueText}>
+              {item.discount_value}% off
+            </Text>
+          )}
+          {item.type === 'free_item' && (
+            <Text style={styles.valueText}>
+              Free {item.free_item_name}
+            </Text>
+          )}
+          {item.type === 'bogo' && (
+            <Text style={styles.valueText}>
+              Buy One Get One Free
+            </Text>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+
+    if (item.status || Platform.OS === 'web') {
+      return (
+        <View style={styles.campaignCard}>
+          {cardContent}
+        </View>
+      );
+    }
+
+    return (
+      <Swipeable
+        renderLeftActions={() => (
+          <RectButton
+            style={[styles.swipeAction, { backgroundColor: Colors.error[500] }]}
+            onPress={() => handleDecline(item)}
+          >
+            <X size={24} color={Colors.white} />
+          </RectButton>
+        )}
+        renderRightActions={() => (
+          <RectButton
+            style={[styles.swipeAction, { backgroundColor: Colors.success[500] }]}
+            onPress={() => handleApprove(item)}
+          >
+            <Check size={24} color={Colors.white} />
+          </RectButton>
+        )}
+        friction={2}
+        leftThreshold={SWIPE_THRESHOLD}
+        rightThreshold={SWIPE_THRESHOLD}
+        overshootLeft={false}
+        overshootRight={false}
+      >
+        <View style={styles.campaignCard}>
+          {cardContent}
+        </View>
+      </Swipeable>
+    );
+  };
+
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaView style={styles.container}>
+        <Header />
         
-        {error && (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
-        )}
-
-        {loading ? (
-          <View style={styles.centerContainer}>
-            <Text style={styles.loadingText}>Loading campaigns...</Text>
-          </View>
-        ) : suggestedCampaigns.length === 0 ? (
-          <View style={styles.centerContainer}>
-            <Text style={styles.emptyText}>No suggested campaigns</Text>
-          </View>
-        ) : (
-          <GestureHandlerRootView style={styles.campaignsContainer}>
-            {suggestedCampaigns.map((campaign, index) => (
-              <View key={index}>
-                {renderCampaignCard(campaign)}
+        <View style={styles.content}>
+          <View style={styles.header}>
+            <Text style={styles.title}>Marketing Campaigns</Text>
+            {restaurant && (
+              <View style={styles.tokenContainer}>
+                <Coins size={20} color={Colors.primary[600]} />
+                <Text style={styles.tokenText}>{restaurant.marketing_tokens} tokens</Text>
               </View>
-            ))}
-          </GestureHandlerRootView>
-        )}
-      </View>
+            )}
+          </View>
 
-      {renderCampaignDetails()}
-    </SafeAreaView>
+          <View style={styles.actions}>
+            <Button
+              title="Scan Coupon"
+              onPress={() => {
+                if (Platform.OS === 'web') {
+                  Alert.alert('Not Supported', 'Coupon scanning is not available on web. Please use a mobile device.');
+                  return;
+                }
+                setShowScanner(true);
+              }}
+              leftIcon={<Camera size={20} color={Colors.white} />}
+              style={styles.scanButton}
+            />
+          </View>
+
+          {error && (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          )}
+
+          {loading ? (
+            <View style={styles.centerContainer}>
+              <Text style={styles.loadingText}>Loading campaigns...</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={[...suggestedCampaigns, ...campaigns]}
+              renderItem={renderSwipeableCard}
+              keyExtractor={(item, index) => item.id || `suggested-${index}`}
+              contentContainerStyle={styles.listContainer}
+              showsVerticalScrollIndicator={false}
+            />
+          )}
+        </View>
+
+        {renderCampaignDetails()}
+
+        {Platform.OS !== 'web' && (
+          <Modal
+            visible={showScanner}
+            animationType="slide"
+            onRequestClose={() => setShowScanner(false)}
+          >
+            <SafeAreaView style={styles.scannerContainer}>
+              <View style={styles.scannerHeader}>
+                <Text style={styles.scannerTitle}>Scan Coupon</Text>
+                <TouchableOpacity onPress={() => setShowScanner(false)}>
+                  <X size={24} color={Colors.neutral[500]} />
+                </TouchableOpacity>
+              </View>
+
+              {hasPermission === false ? (
+                <View style={styles.centerContainer}>
+                  <Text style={styles.errorText}>No access to camera</Text>
+                </View>
+              ) : (
+                <CameraView
+                  style={styles.camera}
+                  barCodeScannerSettings={{
+                    barCodeTypes: ['qr', 'code128'],
+                  }}
+                  onBarcodeScanned={handleScanCode}
+                />
+              )}
+            </SafeAreaView>
+          </Modal>
+        )}
+      </SafeAreaView>
+    </GestureHandlerRootView>
   );
 }
 
@@ -335,30 +503,112 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: Spacing.md,
   },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.lg,
+  },
+  title: {
+    fontFamily: 'Poppins-Bold',
+    fontSize: 24,
+    color: Colors.neutral[900],
+    marginBottom: Spacing.lg,
+  },
   tokenContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.white,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.primary[50],
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.md,
+  },
+  tokenText: {
+    fontFamily: 'Poppins-Medium',
+    fontSize: 14,
+    color: Colors.primary[600],
+    marginLeft: Spacing.xs,
+  },
+  actions: {
+    flexDirection: 'row',
     marginBottom: Spacing.md,
+  },
+  scanButton: {
+    flex: 1,
+  },
+  swipeableContainer: {
+    marginBottom: Spacing.md,
+  },
+  cardTouchable: {
+    flex: 1,
+  },
+  campaignCard: {
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
     shadowColor: Colors.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
   },
-  tokenCount: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 16,
-    color: Colors.neutral[900],
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+  },
+  headerContent: {
+    flex: 1,
     marginLeft: Spacing.sm,
   },
-  title: {
-    fontFamily: 'Poppins-Bold',
-    fontSize: 24,
+  campaignName: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 18,
     color: Colors.neutral[900],
+  },
+  statusContainer: {
+    marginTop: 2,
+  },
+  statusText: {
+    fontFamily: 'Poppins-Medium',
+    fontSize: 14,
+  },
+  description: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 14,
+    color: Colors.neutral[600],
     marginBottom: Spacing.md,
+  },
+  detailsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.sm,
+  },
+  detail: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  detailText: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 14,
+    color: Colors.neutral[600],
+    marginLeft: Spacing.xs,
+  },
+  valueContainer: {
+    backgroundColor: Colors.primary[50],
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    alignSelf: 'flex-start',
+  },
+  valueText: {
+    fontFamily: 'Poppins-Medium',
+    fontSize: 14,
+    color: Colors.primary[700],
+  },
+  swipeAction: {
+    width: SWIPE_THRESHOLD,
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   errorContainer: {
     backgroundColor: Colors.error[50],
@@ -386,91 +636,40 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Colors.neutral[600],
   },
-  campaignsContainer: {
-    flex: 1,
+  listContainer: {
+    paddingBottom: Spacing.xl,
   },
-  campaignCard: {
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius.lg,
+  scannerContainer: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  scannerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     padding: Spacing.md,
-    marginBottom: Spacing.md,
-    shadowColor: Colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    backgroundColor: Colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.neutral[200],
   },
-  campaignHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.xs,
-  },
-  campaignName: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 18,
+  scannerTitle: {
+    fontFamily: 'Poppins-Bold',
+    fontSize: 20,
     color: Colors.neutral[900],
   },
-  campaignDescription: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 14,
-    color: Colors.neutral[600],
-    marginBottom: Spacing.sm,
-  },
-  campaignStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    borderTopWidth: 1,
-    borderTopColor: Colors.neutral[200],
-    paddingTop: Spacing.sm,
-  },
-  statItem: {
+  camera: {
     flex: 1,
-  },
-  statLabel: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 12,
-    color: Colors.neutral[500],
-    marginBottom: 2,
-  },
-  statValue: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 16,
-    color: Colors.neutral[900],
-  },
-  swipeAction: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: 100,
-    height: '100%',
-  },
-  acceptAction: {
-    backgroundColor: Colors.success[500],
-  },
-  declineAction: {
-    backgroundColor: Colors.error[500],
-  },
-  swipeActionText: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 14,
-    color: Colors.white,
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
     backgroundColor: Colors.background,
-    borderTopLeftRadius: BorderRadius.xl,
-    borderTopRightRadius: BorderRadius.xl,
-    height: '80%',
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: Spacing.md,
+    backgroundColor: Colors.white,
     borderBottomWidth: 1,
     borderBottomColor: Colors.neutral[200],
   },
@@ -479,79 +678,88 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: Colors.neutral[900],
   },
-  modalBody: {
+  modalContent: {
+    flex: 1,
     padding: Spacing.md,
   },
-  detailTitle: {
+  modalCard: {
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
+    shadowColor: Colors.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  modalIconContainer: {
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  modalCampaignName: {
     fontFamily: 'Poppins-Bold',
     fontSize: 24,
     color: Colors.neutral[900],
-    marginBottom: Spacing.xs,
+    textAlign: 'center',
+    marginBottom: Spacing.sm,
   },
-  detailDescription: {
+  modalDescription: {
     fontFamily: 'Poppins-Regular',
     fontSize: 16,
     color: Colors.neutral[600],
+    textAlign: 'center',
     marginBottom: Spacing.lg,
   },
-  detailSection: {
-    marginBottom: Spacing.lg,
-  },
-  sectionTitle: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 18,
-    color: Colors.neutral[900],
-    marginBottom: Spacing.sm,
-  },
-  typeTag: {
-    backgroundColor: Colors.primary[100],
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.round,
-    alignSelf: 'flex-start',
-  },
-  typeText: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 14,
-    color: Colors.primary[700],
-  },
-  performanceCard: {
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
+  statsGrid: {
     flexDirection: 'row',
     gap: Spacing.md,
+    marginBottom: Spacing.lg,
   },
-  performanceItem: {
+  statCard: {
     flex: 1,
+    backgroundColor: Colors.neutral[50],
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
     alignItems: 'center',
   },
-  performanceLabel: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 14,
-    color: Colors.neutral[600],
-    marginVertical: Spacing.xs,
-    textAlign: 'center',
-  },
-  performanceValue: {
+  statValue: {
     fontFamily: 'Poppins-Bold',
     fontSize: 18,
     color: Colors.neutral[900],
+    marginVertical: Spacing.xs,
   },
-  periodText: {
+  statLabel: {
     fontFamily: 'Poppins-Regular',
-    fontSize: 16,
-    color: Colors.neutral[700],
+    fontSize: 14,
+    color: Colors.neutral[600],
   },
-  buttonContainer: {
+  detailsList: {
     gap: Spacing.md,
-    marginTop: Spacing.xl,
-    paddingBottom: Platform.OS === 'ios' ? 34 : Spacing.xl,
   },
-  acceptButton: {
-    backgroundColor: Colors.success[600],
+  detailItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: Spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.neutral[200],
   },
-  declineButton: {
-    borderColor: Colors.error[600],
+  detailLabel: {
+    fontFamily: 'Poppins-Medium',
+    fontSize: 16,
+    color: Colors.neutral[600],
+  },
+  detailValue: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 16,
+    color: Colors.neutral[900],
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+    marginTop: Spacing.lg,
+  },
+  modalActionButton: {
+    flex: 1,
   },
 });
