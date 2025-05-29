@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, FlatList, TouchableOpacity, Dimensions, Animated } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, FlatList, TouchableOpacity, Dimensions, Modal, Alert } from 'react-native';
 import { Header } from '@/components/app/Header';
 import { Colors, Spacing, BorderRadius } from '@/constants/Colors';
 import { supabase } from '@/lib/supabase';
 import { useLocalSearchParams } from 'expo-router';
-import { DollarSign, Gift, Percent, ShoppingBag, Clock, Calendar, X, Check, TrendingUp } from 'lucide-react-native';
+import { DollarSign, Gift, Percent, ShoppingBag, Clock, Calendar, X, Check, TrendingUp, Coins } from 'lucide-react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
+import { Button } from '@/components/ui/Button';
+import { CameraView, Camera } from 'expo-camera';
 
 interface MarketingCampaign {
   id: string;
@@ -23,30 +25,71 @@ interface MarketingCampaign {
   expected_revenue: number;
 }
 
+interface Restaurant {
+  id: string;
+  marketing_tokens: number;
+  marketing_enabled: boolean;
+}
+
 const { width } = Dimensions.get('window');
 const SWIPE_THRESHOLD = 120;
 
 export default function MarketingScreen() {
   const { id } = useLocalSearchParams();
   const [campaigns, setCampaigns] = useState<MarketingCampaign[]>([]);
+  const [suggestedCampaigns, setSuggestedCampaigns] = useState<MarketingCampaign[]>([]);
+  const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showScanner, setShowScanner] = useState(false);
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [selectedCampaign, setSelectedCampaign] = useState<MarketingCampaign | null>(null);
 
   useEffect(() => {
-    fetchCampaigns();
+    checkPermissions();
+    fetchRestaurantData();
   }, [id]);
 
-  const fetchCampaigns = async () => {
+  const checkPermissions = async () => {
+    const { status } = await Camera.requestCameraPermissionsAsync();
+    setHasPermission(status === 'granted');
+  };
+
+  const fetchRestaurantData = async () => {
     try {
-      const { data, error } = await supabase
+      const { data: restaurantData, error: restaurantError } = await supabase
+        .from('restaurants')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (restaurantError) throw restaurantError;
+      setRestaurant(restaurantData);
+
+      if (!restaurantData.marketing_enabled) {
+        setError('Marketing features are not enabled for this restaurant');
+        return;
+      }
+
+      const { data: campaignData, error: campaignError } = await supabase
         .from('marketing_campaigns')
         .select('*')
         .eq('restaurant_id', id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setCampaigns(data || []);
+      if (campaignError) throw campaignError;
+      setCampaigns(campaignData || []);
+
+      if (restaurantData.marketing_tokens > 0) {
+        const { data: suggestedData, error: suggestedError } = await supabase
+          .rpc('generate_suggested_campaigns', { 
+            p_restaurant_id: id,
+            p_count: 3
+          });
+
+        if (suggestedError) throw suggestedError;
+        setSuggestedCampaigns(suggestedData || []);
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -55,14 +98,30 @@ export default function MarketingScreen() {
   };
 
   const handleApprove = async (campaign: MarketingCampaign) => {
-    try {
-      const { error } = await supabase
-        .from('marketing_campaigns')
-        .update({ status: 'active' })
-        .eq('id', campaign.id);
+    if (!restaurant || restaurant.marketing_tokens <= 0) {
+      Alert.alert('Error', 'No marketing tokens available');
+      return;
+    }
 
-      if (error) throw error;
-      fetchCampaigns();
+    try {
+      const { error: tokenError } = await supabase
+        .from('restaurants')
+        .update({ marketing_tokens: restaurant.marketing_tokens - 1 })
+        .eq('id', id);
+
+      if (tokenError) throw tokenError;
+
+      const { error: campaignError } = await supabase
+        .from('marketing_campaigns')
+        .insert({
+          ...campaign,
+          restaurant_id: id,
+          status: 'active'
+        });
+
+      if (campaignError) throw campaignError;
+
+      fetchRestaurantData();
     } catch (err: any) {
       setError(err.message);
     }
@@ -76,9 +135,27 @@ export default function MarketingScreen() {
         .eq('id', campaign.id);
 
       if (error) throw error;
-      fetchCampaigns();
+      fetchRestaurantData();
     } catch (err: any) {
       setError(err.message);
+    }
+  };
+
+  const handleScanCode = async ({ data }: { data: string }) => {
+    try {
+      const { data: redemption, error } = await supabase
+        .rpc('redeem_marketing_coupon', {
+          p_code: data,
+          p_order_id: null,
+          p_total_bill: 0
+        });
+
+      if (error) throw error;
+
+      Alert.alert('Success', `Coupon redeemed: ${redemption.campaign_name}`);
+      setShowScanner(false);
+    } catch (err: any) {
+      Alert.alert('Error', err.message);
     }
   };
 
@@ -223,8 +300,25 @@ export default function MarketingScreen() {
       <Header />
       
       <View style={styles.content}>
-        <Text style={styles.title}>Marketing Campaigns</Text>
-        
+        <View style={styles.header}>
+          <Text style={styles.title}>Marketing Campaigns</Text>
+          {restaurant && (
+            <View style={styles.tokenContainer}>
+              <Coins size={20} color={Colors.primary[600]} />
+              <Text style={styles.tokenText}>{restaurant.marketing_tokens} tokens</Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.actions}>
+          <Button
+            title="Scan Coupon"
+            onPress={() => setShowScanner(true)}
+            leftIcon={<Camera size={20} color={Colors.white} />}
+            style={styles.scanButton}
+          />
+        </View>
+
         {error && (
           <View style={styles.errorContainer}>
             <Text style={styles.errorText}>{error}</Text>
@@ -235,20 +329,45 @@ export default function MarketingScreen() {
           <View style={styles.centerContainer}>
             <Text style={styles.loadingText}>Loading campaigns...</Text>
           </View>
-        ) : campaigns.length === 0 ? (
-          <View style={styles.centerContainer}>
-            <Text style={styles.emptyText}>No marketing campaigns yet</Text>
-          </View>
         ) : (
           <FlatList
-            data={campaigns}
+            data={[...suggestedCampaigns, ...campaigns]}
             renderItem={renderCampaignCard}
-            keyExtractor={item => item.id}
+            keyExtractor={(item, index) => item.id || `suggested-${index}`}
             contentContainerStyle={styles.listContainer}
             showsVerticalScrollIndicator={false}
           />
         )}
       </View>
+
+      <Modal
+        visible={showScanner}
+        animationType="slide"
+        onRequestClose={() => setShowScanner(false)}
+      >
+        <SafeAreaView style={styles.scannerContainer}>
+          <View style={styles.scannerHeader}>
+            <Text style={styles.scannerTitle}>Scan Coupon</Text>
+            <TouchableOpacity onPress={() => setShowScanner(false)}>
+              <X size={24} color={Colors.neutral[500]} />
+            </TouchableOpacity>
+          </View>
+
+          {hasPermission === false ? (
+            <View style={styles.centerContainer}>
+              <Text style={styles.errorText}>No access to camera</Text>
+            </View>
+          ) : (
+            <CameraView
+              style={styles.camera}
+              barCodeScannerSettings={{
+                barCodeTypes: ['qr', 'code128'],
+              }}
+              onBarcodeScanned={handleScanCode}
+            />
+          )}
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -262,11 +381,37 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: Spacing.md,
   },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.lg,
+  },
   title: {
     fontFamily: 'Poppins-Bold',
     fontSize: 24,
     color: Colors.neutral[900],
     marginBottom: Spacing.lg,
+  },
+  tokenContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.primary[50],
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.md,
+  },
+  tokenText: {
+    fontFamily: 'Poppins-Medium',
+    fontSize: 14,
+    color: Colors.primary[600],
+    marginLeft: Spacing.xs,
+  },
+  actions: {
+    flexDirection: 'row',
+    marginBottom: Spacing.md,
+  },
+  scanButton: {
+    flex: 1,
   },
   campaignCard: {
     backgroundColor: Colors.white,
@@ -366,5 +511,26 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     paddingBottom: Spacing.xl,
+  },
+  scannerContainer: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  scannerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: Spacing.md,
+    backgroundColor: Colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.neutral[200],
+  },
+  scannerTitle: {
+    fontFamily: 'Poppins-Bold',
+    fontSize: 20,
+    color: Colors.neutral[900],
+  },
+  camera: {
+    flex: 1,
   },
 });
