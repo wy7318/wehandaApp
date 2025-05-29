@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Alert, Modal, Platform } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { Header } from '@/components/app/Header';
 import { Colors, Spacing, BorderRadius } from '@/constants/Colors';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/Button';
-import { Coins, X, ChevronRight, TrendingUp, TrendingDown, CreditCard as Edit2 } from 'lucide-react-native';
-import { Swipeable } from 'react-native-gesture-handler';
+import { ChevronRight, Bell, User } from 'lucide-react-native';
 import { CampaignEditModal } from '@/components/marketing/CampaignEditModal';
 
 interface MarketingCampaign {
+  id: string;
   name: string;
   description: string;
   type: 'amount_off' | 'percentage_off' | 'free_item' | 'bogo';
@@ -116,6 +116,7 @@ export default function MarketingScreen() {
 
       setSuggestedCampaigns(prev => prev.filter(c => c.name !== campaign.name));
       setSelectedCampaign(null);
+      fetchActiveCampaigns();
 
       Alert.alert('Success', 'Campaign created successfully!');
     } catch (err: any) {
@@ -123,229 +124,39 @@ export default function MarketingScreen() {
     }
   };
 
-  const handleDecline = async (campaign: MarketingCampaign) => {
-    if (!restaurant) return;
-
-    try {
-      const { data, error } = await supabase.rpc(
-        'deduct_marketing_tokens',
-        {
-          p_restaurant_id: id,
-          p_amount: 1,
-          p_reason: `Declined campaign: ${campaign.name}`,
-          p_generate_suggestion: true
-        }
-      );
-
-      if (error) throw error;
-
-      if (!data.success) {
-        Alert.alert('Error', 'Insufficient marketing tokens');
-        return;
-      }
-
-      const updatedSuggestions = suggestedCampaigns.filter(c => c.name !== campaign.name);
-      if (data.new_suggestion) {
-        updatedSuggestions.push(data.new_suggestion);
-      }
-      setSuggestedCampaigns(updatedSuggestions);
-
-      setRestaurant(prev => prev ? {
-        ...prev,
-        marketing_tokens: prev.marketing_tokens - 1
-      } : null);
-
-      setSelectedCampaign(null);
-    } catch (err: any) {
-      setError(err.message);
-    }
-  };
-
-  const handleEditCampaign = (campaign: MarketingCampaign) => {
-    setEditingCampaign(campaign);
-  };
-
-  const renderCampaignCard = (campaign: MarketingCampaign) => {
-    const renderSwipeableActions = (progress: any, dragX: any) => {
-      return (
-        <>
-          <TouchableOpacity
-            style={[styles.swipeAction, styles.acceptAction]}
-            onPress={() => handleAccept(campaign)}
-          >
-            <Text style={styles.swipeActionText}>Accept</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.swipeAction, styles.declineAction]}
-            onPress={() => handleDecline(campaign)}
-          >
-            <Text style={styles.swipeActionText}>Decline</Text>
-          </TouchableOpacity>
-        </>
-      );
-    };
-
-    return (
-      <Swipeable renderRightActions={renderSwipeableActions}>
-        <TouchableOpacity
-          style={styles.campaignCard}
-          onPress={() => setSelectedCampaign(campaign)}
-        >
-          <View style={styles.campaignHeader}>
-            <Text style={styles.campaignName}>{campaign.name}</Text>
-            <ChevronRight size={20} color={Colors.neutral[400]} />
-          </View>
-          <Text style={styles.campaignDescription}>{campaign.description}</Text>
-          <View style={styles.campaignStats}>
-            <View style={styles.statItem}>
-              <Text style={styles.statLabel}>Expected Revenue</Text>
-              <Text style={styles.statValue}>${campaign.expected_revenue.toFixed(2)}</Text>
-            </View>
-            {campaign.max_redemptions && (
-              <View style={styles.statItem}>
-                <Text style={styles.statLabel}>Max Redemptions</Text>
-                <Text style={styles.statValue}>{campaign.max_redemptions}</Text>
-              </View>
-            )}
-          </View>
-        </TouchableOpacity>
-      </Swipeable>
-    );
-  };
-
-  const renderActiveCampaignCard = (campaign: MarketingCampaign) => {
-    return (
-      <View style={styles.campaignCard}>
-        <View style={styles.campaignHeader}>
-          <Text style={styles.campaignName}>{campaign.name}</Text>
-          <TouchableOpacity 
-            style={styles.editButton}
-            onPress={() => handleEditCampaign(campaign)}
-          >
-            <Edit2 size={20} color={Colors.primary[600]} />
-          </TouchableOpacity>
-        </View>
-        <Text style={styles.campaignDescription}>{campaign.description}</Text>
-        <View style={styles.campaignStats}>
-          <View style={styles.statItem}>
-            <Text style={styles.statLabel}>
-              {campaign.type === 'amount_off' ? 'Discount Amount' : 
-               campaign.type === 'percentage_off' ? 'Discount Percentage' : 
-               'Expected Revenue'}
-            </Text>
-            <Text style={styles.statValue}>
-              {campaign.type === 'amount_off' ? `$${campaign.discount_value}` :
-               campaign.type === 'percentage_off' ? `${campaign.discount_value}%` :
-               `$${campaign.expected_revenue}`}
-            </Text>
-          </View>
-          {campaign.period_type === 'limited_number' && (
-            <View style={styles.statItem}>
-              <Text style={styles.statLabel}>Remaining Redemptions</Text>
-              <Text style={styles.statValue}>{campaign.max_redemptions}</Text>
-            </View>
-          )}
-          {campaign.period_type === 'date_range' && (
-            <View style={styles.statItem}>
-              <Text style={styles.statLabel}>End Date</Text>
-              <Text style={styles.statValue}>
-                {new Date(campaign.end_date!).toLocaleDateString()}
-              </Text>
-            </View>
-          )}
-        </View>
+  const renderCampaignCard = (campaign: MarketingCampaign, isActive: boolean = false) => (
+    <TouchableOpacity
+      style={styles.campaignCard}
+      onPress={() => isActive ? setEditingCampaign(campaign) : handleAccept(campaign)}
+    >
+      <View style={styles.campaignHeader}>
+        <Text style={styles.campaignName}>{campaign.name}</Text>
+        <ChevronRight size={20} color={Colors.neutral[400]} />
       </View>
-    );
-  };
-
-  const renderCampaignDetails = () => {
-    if (!selectedCampaign) return null;
-
-    return (
-      <Modal
-        visible={!!selectedCampaign}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setSelectedCampaign(null)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Campaign Details</Text>
-              <TouchableOpacity onPress={() => setSelectedCampaign(null)}>
-                <X size={24} color={Colors.neutral[500]} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.modalBody}>
-              <Text style={styles.detailTitle}>{selectedCampaign.name}</Text>
-              <Text style={styles.detailDescription}>{selectedCampaign.description}</Text>
-
-              <View style={styles.detailSection}>
-                <Text style={styles.sectionTitle}>Campaign Type</Text>
-                <View style={styles.typeTag}>
-                  <Text style={styles.typeText}>
-                    {selectedCampaign.type.replace('_', ' ').toUpperCase()}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.detailSection}>
-                <Text style={styles.sectionTitle}>Expected Performance</Text>
-                <View style={styles.performanceCard}>
-                  <View style={styles.performanceItem}>
-                    <TrendingUp size={24} color={Colors.success[600]} />
-                    <Text style={styles.performanceLabel}>Expected Revenue</Text>
-                    <Text style={styles.performanceValue}>
-                      ${selectedCampaign.expected_revenue.toFixed(2)}
-                    </Text>
-                  </View>
-                  {selectedCampaign.max_redemptions && (
-                    <View style={styles.performanceItem}>
-                      <TrendingDown size={24} color={Colors.primary[600]} />
-                      <Text style={styles.performanceLabel}>Max Redemptions</Text>
-                      <Text style={styles.performanceValue}>
-                        {selectedCampaign.max_redemptions}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-
-              <View style={styles.detailSection}>
-                <Text style={styles.sectionTitle}>Campaign Period</Text>
-                <Text style={styles.periodText}>
-                  {selectedCampaign.period_type === 'date_range'
-                    ? `${new Date(selectedCampaign.start_date!).toLocaleDateString()} - ${new Date(selectedCampaign.end_date!).toLocaleDateString()}`
-                    : selectedCampaign.period_type === 'limited_number'
-                    ? `Limited to ${selectedCampaign.max_redemptions} redemptions`
-                    : 'Unlimited period'}
-                </Text>
-              </View>
-
-              <View style={styles.buttonContainer}>
-                <Button
-                  title="Accept Campaign"
-                  onPress={() => handleAccept(selectedCampaign)}
-                  style={styles.acceptButton}
-                />
-                <Button
-                  title="Decline Campaign"
-                  variant="outline"
-                  onPress={() => handleDecline(selectedCampaign)}
-                  style={styles.declineButton}
-                />
-              </View>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-    );
-  };
+      <Text style={styles.campaignDescription}>{campaign.description}</Text>
+      <Text style={styles.revenueText}>Expected Revenue</Text>
+      <Text style={styles.revenueAmount}>${campaign.expected_revenue.toFixed(2)}</Text>
+    </TouchableOpacity>
+  );
 
   return (
     <SafeAreaView style={styles.container}>
-      <Header title="Marketing" />
+      <View style={styles.header}>
+        <Text style={styles.restaurantName}>{restaurant?.name || 'Best Pizza'}</Text>
+        <View style={styles.headerIcons}>
+          <Bell size={24} color={Colors.neutral[900]} />
+          <User size={24} color={Colors.neutral[900]} style={styles.userIcon} />
+        </View>
+      </View>
+
+      {restaurant && (
+        <View style={styles.tokenBanner}>
+          <Text style={styles.tokenText}>
+            {restaurant.marketing_tokens} Marketing Tokens Available
+          </Text>
+        </View>
+      )}
+
       <ScrollView style={styles.content}>
         {error && (
           <View style={styles.errorContainer}>
@@ -353,18 +164,9 @@ export default function MarketingScreen() {
           </View>
         )}
 
-        {restaurant && (
-          <View style={styles.tokenContainer}>
-            <Coins size={24} color={Colors.primary[600]} />
-            <Text style={styles.tokenText}>
-              {restaurant.marketing_tokens} Marketing Tokens Available
-            </Text>
-          </View>
-        )}
-
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Active Campaigns</Text>
-          {activeCampaigns.map(campaign => renderActiveCampaignCard(campaign))}
+          {activeCampaigns.map(campaign => renderCampaignCard(campaign, true))}
         </View>
 
         <View style={styles.section}>
@@ -377,27 +179,14 @@ export default function MarketingScreen() {
         </View>
       </ScrollView>
 
-      {renderCampaignDetails()}
-
       {editingCampaign && (
         <CampaignEditModal
+          visible={!!editingCampaign}
           campaign={editingCampaign}
           onClose={() => setEditingCampaign(null)}
-          onSave={async (updatedCampaign) => {
-            try {
-              const { error } = await supabase
-                .from('marketing_campaigns')
-                .update(updatedCampaign)
-                .eq('id', editingCampaign.id);
-
-              if (error) throw error;
-
-              fetchActiveCampaigns();
-              setEditingCampaign(null);
-              Alert.alert('Success', 'Campaign updated successfully!');
-            } catch (err: any) {
-              setError(err.message);
-            }
+          onUpdate={() => {
+            fetchActiveCampaigns();
+            setEditingCampaign(null);
           }}
         />
       )}
@@ -408,195 +197,106 @@ export default function MarketingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.neutral[50],
+    backgroundColor: Colors.background,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: Spacing.md,
+    backgroundColor: Colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.neutral[200],
+  },
+  restaurantName: {
+    fontFamily: 'Poppins-Bold',
+    fontSize: 20,
+    color: Colors.neutral[900],
+  },
+  headerIcons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  userIcon: {
+    marginLeft: Spacing.md,
+  },
+  tokenBanner: {
+    backgroundColor: Colors.error[50],
+    padding: Spacing.sm,
+  },
+  tokenText: {
+    fontFamily: 'Poppins-Medium',
+    fontSize: 14,
+    color: Colors.error[700],
+    textAlign: 'center',
   },
   content: {
     flex: 1,
-    padding: Spacing.medium,
-  },
-  errorContainer: {
-    backgroundColor: Colors.error[100],
-    padding: Spacing.medium,
-    borderRadius: BorderRadius.medium,
-    marginBottom: Spacing.medium,
-  },
-  errorText: {
-    color: Colors.error[700],
-    fontSize: 14,
-  },
-  tokenContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.primary[100],
-    padding: Spacing.medium,
-    borderRadius: BorderRadius.medium,
-    marginBottom: Spacing.medium,
-  },
-  tokenText: {
-    marginLeft: Spacing.small,
-    color: Colors.primary[700],
-    fontSize: 16,
-    fontWeight: '600',
+    padding: Spacing.md,
   },
   section: {
-    marginBottom: Spacing.large,
+    marginBottom: Spacing.lg,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 16,
     color: Colors.neutral[900],
-    marginBottom: Spacing.medium,
-  },
-  loadingText: {
-    color: Colors.neutral[500],
-    textAlign: 'center',
-    marginTop: Spacing.medium,
+    marginBottom: Spacing.md,
   },
   campaignCard: {
     backgroundColor: Colors.white,
-    borderRadius: BorderRadius.medium,
-    padding: Spacing.medium,
-    marginBottom: Spacing.medium,
-    shadowColor: Colors.neutral[900],
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+    shadowColor: Colors.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 2,
   },
   campaignHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: Spacing.small,
+    marginBottom: Spacing.xs,
   },
   campaignName: {
+    fontFamily: 'Poppins-SemiBold',
     fontSize: 16,
-    fontWeight: '600',
     color: Colors.neutral[900],
   },
   campaignDescription: {
+    fontFamily: 'Poppins-Regular',
     fontSize: 14,
     color: Colors.neutral[600],
-    marginBottom: Spacing.medium,
+    marginBottom: Spacing.sm,
   },
-  campaignStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  statItem: {
-    flex: 1,
-  },
-  statLabel: {
+  revenueText: {
+    fontFamily: 'Poppins-Regular',
     fontSize: 12,
     color: Colors.neutral[500],
-    marginBottom: 4,
+    marginBottom: 2,
   },
-  statValue: {
+  revenueAmount: {
+    fontFamily: 'Poppins-SemiBold',
     fontSize: 16,
-    fontWeight: '600',
     color: Colors.neutral[900],
   },
-  editButton: {
-    padding: Spacing.small,
+  errorContainer: {
+    backgroundColor: Colors.error[50],
+    padding: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    marginBottom: Spacing.md,
   },
-  swipeAction: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: 100,
-    height: '100%',
+  errorText: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 14,
+    color: Colors.error[700],
   },
-  acceptAction: {
-    backgroundColor: Colors.success[500],
-  },
-  declineAction: {
-    backgroundColor: Colors.error[500],
-  },
-  swipeActionText: {
-    color: Colors.white,
-    fontWeight: '600',
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: Colors.white,
-    borderTopLeftRadius: BorderRadius.large,
-    borderTopRightRadius: BorderRadius.large,
-    height: '80%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: Spacing.medium,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.neutral[200],
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: Colors.neutral[900],
-  },
-  modalBody: {
-    padding: Spacing.medium,
-  },
-  detailTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: Colors.neutral[900],
-    marginBottom: Spacing.small,
-  },
-  detailDescription: {
-    fontSize: 16,
-    color: Colors.neutral[600],
-    marginBottom: Spacing.large,
-  },
-  detailSection: {
-    marginBottom: Spacing.large,
-  },
-  typeTag: {
-    backgroundColor: Colors.primary[100],
-    paddingHorizontal: Spacing.medium,
-    paddingVertical: Spacing.small,
-    borderRadius: BorderRadius.medium,
-    alignSelf: 'flex-start',
-  },
-  typeText: {
-    color: Colors.primary[700],
-    fontWeight: '600',
-  },
-  performanceCard: {
-    backgroundColor: Colors.neutral[100],
-    borderRadius: BorderRadius.medium,
-    padding: Spacing.medium,
-  },
-  performanceItem: {
-    marginBottom: Spacing.medium,
-  },
-  performanceLabel: {
+  loadingText: {
+    fontFamily: 'Poppins-Regular',
     fontSize: 14,
     color: Colors.neutral[600],
-    marginVertical: Spacing.small,
-  },
-  performanceValue: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: Colors.neutral[900],
-  },
-  periodText: {
-    fontSize: 16,
-    color: Colors.neutral[700],
-  },
-  buttonContainer: {
-    marginTop: Spacing.large,
-    gap: Spacing.medium,
-  },
-  acceptButton: {
-    backgroundColor: Colors.success[500],
-  },
-  declineButton: {
-    borderColor: Colors.error[500],
+    textAlign: 'center',
   },
 });
