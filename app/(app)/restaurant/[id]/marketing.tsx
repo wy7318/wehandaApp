@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, FlatList, TouchableOpacity, Dimensions, Modal, Alert } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, FlatList, TouchableOpacity, Dimensions, Modal, Alert, Platform } from 'react-native';
 import { Header } from '@/components/app/Header';
 import { Colors, Spacing, BorderRadius } from '@/constants/Colors';
 import { supabase } from '@/lib/supabase';
 import { useLocalSearchParams } from 'expo-router';
-import { DollarSign, Gift, Percent, ShoppingBag, Clock, Calendar, X, Check, TrendingUp, Coins } from 'lucide-react-native';
+import { DollarSign, Gift, Percent, ShoppingBag, Clock, Calendar, X, Check, TrendingUp, Coins, Camera } from 'lucide-react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { Button } from '@/components/ui/Button';
-import { CameraView, Camera } from 'expo-camera';
+import { CameraView } from 'expo-camera';
 
 interface MarketingCampaign {
   id: string;
@@ -46,7 +46,9 @@ export default function MarketingScreen() {
   const [selectedCampaign, setSelectedCampaign] = useState<MarketingCampaign | null>(null);
 
   useEffect(() => {
-    checkPermissions();
+    if (Platform.OS !== 'web') {
+      checkPermissions();
+    }
     fetchRestaurantData();
   }, [id]);
 
@@ -313,7 +315,13 @@ export default function MarketingScreen() {
         <View style={styles.actions}>
           <Button
             title="Scan Coupon"
-            onPress={() => setShowScanner(true)}
+            onPress={() => {
+              if (Platform.OS === 'web') {
+                Alert.alert('Not Supported', 'Coupon scanning is not available on web. Please use a mobile device.');
+                return;
+              }
+              setShowScanner(true);
+            }}
             leftIcon={<Camera size={20} color={Colors.white} />}
             style={styles.scanButton}
           />
@@ -340,34 +348,36 @@ export default function MarketingScreen() {
         )}
       </View>
 
-      <Modal
-        visible={showScanner}
-        animationType="slide"
-        onRequestClose={() => setShowScanner(false)}
-      >
-        <SafeAreaView style={styles.scannerContainer}>
-          <View style={styles.scannerHeader}>
-            <Text style={styles.scannerTitle}>Scan Coupon</Text>
-            <TouchableOpacity onPress={() => setShowScanner(false)}>
-              <X size={24} color={Colors.neutral[500]} />
-            </TouchableOpacity>
-          </View>
-
-          {hasPermission === false ? (
-            <View style={styles.centerContainer}>
-              <Text style={styles.errorText}>No access to camera</Text>
+      {Platform.OS !== 'web' && (
+        <Modal
+          visible={showScanner}
+          animationType="slide"
+          onRequestClose={() => setShowScanner(false)}
+        >
+          <SafeAreaView style={styles.scannerContainer}>
+            <View style={styles.scannerHeader}>
+              <Text style={styles.scannerTitle}>Scan Coupon</Text>
+              <TouchableOpacity onPress={() => setShowScanner(false)}>
+                <X size={24} color={Colors.neutral[500]} />
+              </TouchableOpacity>
             </View>
-          ) : (
-            <CameraView
-              style={styles.camera}
-              barCodeScannerSettings={{
-                barCodeTypes: ['qr', 'code128'],
-              }}
-              onBarcodeScanned={handleScanCode}
-            />
-          )}
-        </SafeAreaView>
-      </Modal>
+
+            {hasPermission === false ? (
+              <View style={styles.centerContainer}>
+                <Text style={styles.errorText}>No access to camera</Text>
+              </View>
+            ) : (
+              <CameraView
+                style={styles.camera}
+                barCodeScannerSettings={{
+                  barCodeTypes: ['qr', 'code128'],
+                }}
+                onBarcodeScanned={handleScanCode}
+              />
+            )}
+          </SafeAreaView>
+        </Modal>
+      )}
     </SafeAreaView>
   );
 }
