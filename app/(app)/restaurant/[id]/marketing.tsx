@@ -342,4 +342,261 @@ export default function MarketingScreen() {
       </Modal>
     );
   };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <Header title="Marketing" />
+      <ScrollView style={styles.content}>
+        {error && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        )}
+
+        {restaurant && (
+          <View style={styles.tokenContainer}>
+            <Coins size={24} color={Colors.primary[600]} />
+            <Text style={styles.tokenText}>
+              {restaurant.marketing_tokens} Marketing Tokens Available
+            </Text>
+          </View>
+        )}
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Active Campaigns</Text>
+          {activeCampaigns.map(campaign => renderActiveCampaignCard(campaign))}
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Suggested Campaigns</Text>
+          {loading ? (
+            <Text style={styles.loadingText}>Loading campaigns...</Text>
+          ) : (
+            suggestedCampaigns.map(campaign => renderCampaignCard(campaign))
+          )}
+        </View>
+      </ScrollView>
+
+      {renderCampaignDetails()}
+
+      {editingCampaign && (
+        <CampaignEditModal
+          campaign={editingCampaign}
+          onClose={() => setEditingCampaign(null)}
+          onSave={async (updatedCampaign) => {
+            try {
+              const { error } = await supabase
+                .from('marketing_campaigns')
+                .update(updatedCampaign)
+                .eq('id', editingCampaign.id);
+
+              if (error) throw error;
+
+              fetchActiveCampaigns();
+              setEditingCampaign(null);
+              Alert.alert('Success', 'Campaign updated successfully!');
+            } catch (err: any) {
+              setError(err.message);
+            }
+          }}
+        />
+      )}
+    </SafeAreaView>
+  );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: Colors.neutral[50],
+  },
+  content: {
+    flex: 1,
+    padding: Spacing.medium,
+  },
+  errorContainer: {
+    backgroundColor: Colors.error[100],
+    padding: Spacing.medium,
+    borderRadius: BorderRadius.medium,
+    marginBottom: Spacing.medium,
+  },
+  errorText: {
+    color: Colors.error[700],
+    fontSize: 14,
+  },
+  tokenContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.primary[100],
+    padding: Spacing.medium,
+    borderRadius: BorderRadius.medium,
+    marginBottom: Spacing.medium,
+  },
+  tokenText: {
+    marginLeft: Spacing.small,
+    color: Colors.primary[700],
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  section: {
+    marginBottom: Spacing.large,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: Colors.neutral[900],
+    marginBottom: Spacing.medium,
+  },
+  loadingText: {
+    color: Colors.neutral[500],
+    textAlign: 'center',
+    marginTop: Spacing.medium,
+  },
+  campaignCard: {
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.medium,
+    padding: Spacing.medium,
+    marginBottom: Spacing.medium,
+    shadowColor: Colors.neutral[900],
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  campaignHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.small,
+  },
+  campaignName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.neutral[900],
+  },
+  campaignDescription: {
+    fontSize: 14,
+    color: Colors.neutral[600],
+    marginBottom: Spacing.medium,
+  },
+  campaignStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  statItem: {
+    flex: 1,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: Colors.neutral[500],
+    marginBottom: 4,
+  },
+  statValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.neutral[900],
+  },
+  editButton: {
+    padding: Spacing.small,
+  },
+  swipeAction: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 100,
+    height: '100%',
+  },
+  acceptAction: {
+    backgroundColor: Colors.success[500],
+  },
+  declineAction: {
+    backgroundColor: Colors.error[500],
+  },
+  swipeActionText: {
+    color: Colors.white,
+    fontWeight: '600',
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: BorderRadius.large,
+    borderTopRightRadius: BorderRadius.large,
+    height: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: Spacing.medium,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.neutral[200],
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: Colors.neutral[900],
+  },
+  modalBody: {
+    padding: Spacing.medium,
+  },
+  detailTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: Colors.neutral[900],
+    marginBottom: Spacing.small,
+  },
+  detailDescription: {
+    fontSize: 16,
+    color: Colors.neutral[600],
+    marginBottom: Spacing.large,
+  },
+  detailSection: {
+    marginBottom: Spacing.large,
+  },
+  typeTag: {
+    backgroundColor: Colors.primary[100],
+    paddingHorizontal: Spacing.medium,
+    paddingVertical: Spacing.small,
+    borderRadius: BorderRadius.medium,
+    alignSelf: 'flex-start',
+  },
+  typeText: {
+    color: Colors.primary[700],
+    fontWeight: '600',
+  },
+  performanceCard: {
+    backgroundColor: Colors.neutral[100],
+    borderRadius: BorderRadius.medium,
+    padding: Spacing.medium,
+  },
+  performanceItem: {
+    marginBottom: Spacing.medium,
+  },
+  performanceLabel: {
+    fontSize: 14,
+    color: Colors.neutral[600],
+    marginVertical: Spacing.small,
+  },
+  performanceValue: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: Colors.neutral[900],
+  },
+  periodText: {
+    fontSize: 16,
+    color: Colors.neutral[700],
+  },
+  buttonContainer: {
+    marginTop: Spacing.large,
+    gap: Spacing.medium,
+  },
+  acceptButton: {
+    backgroundColor: Colors.success[500],
+  },
+  declineButton: {
+    borderColor: Colors.error[500],
+  },
+});
