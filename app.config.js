@@ -12,7 +12,10 @@ module.exports = {
     ],
     ios: {
       supportsTablet: true,
-      bundleIdentifier: "com.wehanda.mobile"
+      bundleIdentifier: "com.wehanda.mobile",
+      infoPlist: {
+        "ITSAppUsesNonExemptEncryption": false
+        }
     },
     android: {
       adaptiveIcon: {
