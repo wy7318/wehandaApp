@@ -21,7 +21,7 @@ interface MarketingCampaign {
   max_redemptions?: number;
   start_date?: string;
   end_date?: string;
-  status: 'draft' | 'active' | 'paused' | 'expired' | 'cancelled';
+  status?: 'draft' | 'active' | 'paused' | 'expired' | 'cancelled';
   expected_revenue: number;
 }
 
@@ -212,6 +212,10 @@ export default function MarketingScreen() {
   };
 
   const renderCampaignCard = ({ item }: { item: MarketingCampaign }) => {
+    // Add default status for suggested campaigns
+    const status = item.status || 'suggested';
+    const displayStatus = status.charAt(0).toUpperCase() + status.slice(1);
+
     return (
       <GestureHandlerRootView>
         <Swipeable
@@ -239,9 +243,9 @@ export default function MarketingScreen() {
                 <View style={styles.statusContainer}>
                   <Text style={[
                     styles.statusText,
-                    { color: item.status === 'active' ? Colors.success[600] : Colors.neutral[600] }
+                    { color: status === 'active' ? Colors.success[600] : Colors.neutral[600] }
                   ]}>
-                    {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+                    {displayStatus}
                   </Text>
                 </View>
               </View>
