@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { CameraView } from 'expo-camera';
 
 interface MarketingCampaign {
-  id: string;
+  id?: string;
   name: string;
   description: string;
   type: 'amount_off' | 'percentage_off' | 'free_item' | 'bogo';
@@ -130,6 +130,13 @@ export default function MarketingScreen() {
   };
 
   const handleDecline = async (campaign: MarketingCampaign) => {
+    // Skip database update for suggested campaigns (they don't exist in the database yet)
+    if (!campaign.id) {
+      const updatedSuggestions = suggestedCampaigns.filter(c => c.name !== campaign.name);
+      setSuggestedCampaigns(updatedSuggestions);
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('marketing_campaigns')
@@ -212,9 +219,81 @@ export default function MarketingScreen() {
   };
 
   const renderCampaignCard = ({ item }: { item: MarketingCampaign }) => {
-    // Add default status for suggested campaigns
     const status = item.status || 'suggested';
     const displayStatus = status.charAt(0).toUpperCase() + status.slice(1);
+
+    const cardContent = (
+      <TouchableOpacity
+        style={styles.campaignCard}
+        onPress={() => setSelectedCampaign(item)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.cardHeader}>
+          {renderCampaignIcon(item.type)}
+          <View style={styles.headerContent}>
+            <Text style={styles.campaignName}>{item.name}</Text>
+            <View style={styles.statusContainer}>
+              <Text style={[
+                styles.statusText,
+                { color: status === 'active' ? Colors.success[600] : Colors.neutral[600] }
+              ]}>
+                {displayStatus}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        <Text style={styles.description}>{item.description}</Text>
+
+        <View style={styles.detailsContainer}>
+          <View style={styles.detail}>
+            {renderPeriodIcon(item.period_type)}
+            <Text style={styles.detailText}>
+              {item.period_type === 'limited_number'
+                ? `${item.max_redemptions} redemptions`
+                : item.period_type === 'date_range'
+                ? `Until ${new Date(item.end_date!).toLocaleDateString()}`
+                : 'Unlimited'}
+            </Text>
+          </View>
+
+          <View style={styles.detail}>
+            <TrendingUp size={20} color={Colors.neutral[600]} />
+            <Text style={styles.detailText}>
+              ${item.expected_revenue.toFixed(2)} expected
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.valueContainer}>
+          {item.type === 'amount_off' && (
+            <Text style={styles.valueText}>
+              ${item.discount_value.toFixed(2)} off
+            </Text>
+          )}
+          {item.type === 'percentage_off' && (
+            <Text style={styles.valueText}>
+              {item.discount_value}% off
+            </Text>
+          )}
+          {item.type === 'free_item' && (
+            <Text style={styles.valueText}>
+              Free {item.free_item_name}
+            </Text>
+          )}
+          {item.type === 'bogo' && (
+            <Text style={styles.valueText}>
+              Buy One Get One Free
+            </Text>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+
+    // Only use Swipeable on native platforms
+    if (Platform.OS === 'web') {
+      return cardContent;
+    }
 
     return (
       <GestureHandlerRootView>
@@ -231,71 +310,7 @@ export default function MarketingScreen() {
           overshootLeft={false}
           overshootRight={false}
         >
-          <TouchableOpacity
-            style={styles.campaignCard}
-            onPress={() => setSelectedCampaign(item)}
-            activeOpacity={0.7}
-          >
-            <View style={styles.cardHeader}>
-              {renderCampaignIcon(item.type)}
-              <View style={styles.headerContent}>
-                <Text style={styles.campaignName}>{item.name}</Text>
-                <View style={styles.statusContainer}>
-                  <Text style={[
-                    styles.statusText,
-                    { color: status === 'active' ? Colors.success[600] : Colors.neutral[600] }
-                  ]}>
-                    {displayStatus}
-                  </Text>
-                </View>
-              </View>
-            </View>
-
-            <Text style={styles.description}>{item.description}</Text>
-
-            <View style={styles.detailsContainer}>
-              <View style={styles.detail}>
-                {renderPeriodIcon(item.period_type)}
-                <Text style={styles.detailText}>
-                  {item.period_type === 'limited_number'
-                    ? `${item.max_redemptions} redemptions`
-                    : item.period_type === 'date_range'
-                    ? `Until ${new Date(item.end_date!).toLocaleDateString()}`
-                    : 'Unlimited'}
-                </Text>
-              </View>
-
-              <View style={styles.detail}>
-                <TrendingUp size={20} color={Colors.neutral[600]} />
-                <Text style={styles.detailText}>
-                  ${item.expected_revenue.toFixed(2)} expected
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.valueContainer}>
-              {item.type === 'amount_off' && (
-                <Text style={styles.valueText}>
-                  ${item.discount_value.toFixed(2)} off
-                </Text>
-              )}
-              {item.type === 'percentage_off' && (
-                <Text style={styles.valueText}>
-                  {item.discount_value}% off
-                </Text>
-              )}
-              {item.type === 'free_item' && (
-                <Text style={styles.valueText}>
-                  Free {item.free_item_name}
-                </Text>
-              )}
-              {item.type === 'bogo' && (
-                <Text style={styles.valueText}>
-                  Buy One Get One Free
-                </Text>
-              )}
-            </View>
-          </TouchableOpacity>
+          {cardContent}
         </Swipeable>
       </GestureHandlerRootView>
     );
