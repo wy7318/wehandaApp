@@ -54,12 +54,12 @@ export default function RestaurantDetails() {
   return (
     <SafeAreaView style={styles.container}>
       <Header />
-      
+
       <View style={styles.content}>
         <RestaurantSwitcher />
-        
+
         <Text style={styles.title}>Activities</Text>
-        
+
         <FlatList
           data={activities}
           keyExtractor={(item) => item}
