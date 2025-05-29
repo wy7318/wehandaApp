@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, FlatList } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useRestaurant } from '@/contexts/RestaurantContext';
@@ -6,11 +6,13 @@ import { Header } from '@/components/app/Header';
 import { RestaurantSwitcher } from '@/components/app/RestaurantSwitcher';
 import { ActivityCard, ActivityType } from '@/components/restaurant/ActivityCard';
 import { Colors, Spacing } from '@/constants/Colors';
+import { AnalyticsModal } from '@/components/restaurant/AnalyticsModal';
 
 export default function RestaurantDetails() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { userRestaurants, selectRestaurant, selectedRestaurant } = useRestaurant();
+  const [showAnalytics, setShowAnalytics] = useState(false);
 
   useEffect(() => {
     // Find and select the restaurant by ID
@@ -20,11 +22,20 @@ export default function RestaurantDetails() {
     }
   }, [id, userRestaurants]);
 
-  const activities: ActivityType[] = ['waitlist', 'dashboard', 'table-order', 'settings'];
+  const activities: ActivityType[] = [
+    'waitlist',
+    'dashboard',
+    'reservations',
+    'customers',
+    'analytics',
+    'table-order',
+    'settings'
+  ];
 
   const handleActivityPress = (activityType: ActivityType) => {
-    // For this MVP, we're just showing a message for non-dashboard activities
-    if (activityType !== 'dashboard' && activityType !== 'waitlist') {
+    if (activityType === 'analytics') {
+      setShowAnalytics(true);
+    } else if (activityType !== 'dashboard' && activityType !== 'waitlist' && activityType !== 'reservations' && activityType !== 'customers') {
       alert(`${activityType.charAt(0).toUpperCase() + activityType.slice(1).replace('-', ' ')} selected.`);
     }
   };
@@ -43,12 +54,12 @@ export default function RestaurantDetails() {
   return (
     <SafeAreaView style={styles.container}>
       <Header />
-      
+
       <View style={styles.content}>
         <RestaurantSwitcher />
-        
+
         <Text style={styles.title}>Activities</Text>
-        
+
         <FlatList
           data={activities}
           keyExtractor={(item) => item}
@@ -61,6 +72,12 @@ export default function RestaurantDetails() {
           )}
           numColumns={2}
           contentContainerStyle={styles.activitiesContainer}
+        />
+
+        <AnalyticsModal
+          visible={showAnalytics}
+          onClose={() => setShowAnalytics(false)}
+          restaurantId={selectedRestaurant.id}
         />
       </View>
     </SafeAreaView>

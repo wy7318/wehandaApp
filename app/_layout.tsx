@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { Platform } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
@@ -16,9 +17,11 @@ SplashScreen.preventAutoHideAsync();
 export default function RootLayout() {
   useFrameworkReady();
 
-  // Activate keep awake when the app starts
+  // Activate keep awake only on native platforms
   useEffect(() => {
-    activateKeepAwake();
+    if (Platform.OS !== 'web') {
+      activateKeepAwake();
+    }
   }, []);
 
   const [fontsLoaded, fontError] = useFonts({
