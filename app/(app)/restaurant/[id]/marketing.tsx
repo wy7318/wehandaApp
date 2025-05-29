@@ -319,87 +319,89 @@ export default function MarketingScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Header />
-      
-      <View style={styles.content}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Marketing Campaigns</Text>
-          {restaurant && (
-            <View style={styles.tokenContainer}>
-              <Coins size={20} color={Colors.primary[600]} />
-              <Text style={styles.tokenText}>{restaurant.marketing_tokens} tokens</Text>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaView style={styles.container}>
+        <Header />
+        
+        <View style={styles.content}>
+          <View style={styles.header}>
+            <Text style={styles.title}>Marketing Campaigns</Text>
+            {restaurant && (
+              <View style={styles.tokenContainer}>
+                <Coins size={20} color={Colors.primary[600]} />
+                <Text style={styles.tokenText}>{restaurant.marketing_tokens} tokens</Text>
+              </View>
+            )}
+          </View>
+
+          <View style={styles.actions}>
+            <Button
+              title="Scan Coupon"
+              onPress={() => {
+                if (Platform.OS === 'web') {
+                  Alert.alert('Not Supported', 'Coupon scanning is not available on web. Please use a mobile device.');
+                  return;
+                }
+                setShowScanner(true);
+              }}
+              leftIcon={<Camera size={20} color={Colors.white} />}
+              style={styles.scanButton}
+            />
+          </View>
+
+          {error && (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>{error}</Text>
             </View>
+          )}
+
+          {loading ? (
+            <View style={styles.centerContainer}>
+              <Text style={styles.loadingText}>Loading campaigns...</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={[...suggestedCampaigns, ...campaigns]}
+              renderItem={renderCampaignCard}
+              keyExtractor={(item, index) => item.id || `suggested-${index}`}
+              contentContainerStyle={styles.listContainer}
+              showsVerticalScrollIndicator={false}
+            />
           )}
         </View>
 
-        <View style={styles.actions}>
-          <Button
-            title="Scan Coupon"
-            onPress={() => {
-              if (Platform.OS === 'web') {
-                Alert.alert('Not Supported', 'Coupon scanning is not available on web. Please use a mobile device.');
-                return;
-              }
-              setShowScanner(true);
-            }}
-            leftIcon={<Camera size={20} color={Colors.white} />}
-            style={styles.scanButton}
-          />
-        </View>
-
-        {error && (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
-        )}
-
-        {loading ? (
-          <View style={styles.centerContainer}>
-            <Text style={styles.loadingText}>Loading campaigns...</Text>
-          </View>
-        ) : (
-          <FlatList
-            data={[...suggestedCampaigns, ...campaigns]}
-            renderItem={renderCampaignCard}
-            keyExtractor={(item, index) => item.id || `suggested-${index}`}
-            contentContainerStyle={styles.listContainer}
-            showsVerticalScrollIndicator={false}
-          />
-        )}
-      </View>
-
-      {Platform.OS !== 'web' && (
-        <Modal
-          visible={showScanner}
-          animationType="slide"
-          onRequestClose={() => setShowScanner(false)}
-        >
-          <SafeAreaView style={styles.scannerContainer}>
-            <View style={styles.scannerHeader}>
-              <Text style={styles.scannerTitle}>Scan Coupon</Text>
-              <TouchableOpacity onPress={() => setShowScanner(false)}>
-                <X size={24} color={Colors.neutral[500]} />
-              </TouchableOpacity>
-            </View>
-
-            {hasPermission === false ? (
-              <View style={styles.centerContainer}>
-                <Text style={styles.errorText}>No access to camera</Text>
+        {Platform.OS !== 'web' && (
+          <Modal
+            visible={showScanner}
+            animationType="slide"
+            onRequestClose={() => setShowScanner(false)}
+          >
+            <SafeAreaView style={styles.scannerContainer}>
+              <View style={styles.scannerHeader}>
+                <Text style={styles.scannerTitle}>Scan Coupon</Text>
+                <TouchableOpacity onPress={() => setShowScanner(false)}>
+                  <X size={24} color={Colors.neutral[500]} />
+                </TouchableOpacity>
               </View>
-            ) : (
-              <CameraView
-                style={styles.camera}
-                barCodeScannerSettings={{
-                  barCodeTypes: ['qr', 'code128'],
-                }}
-                onBarcodeScanned={handleScanCode}
-              />
-            )}
-          </SafeAreaView>
-        </Modal>
-      )}
-    </SafeAreaView>
+
+              {hasPermission === false ? (
+                <View style={styles.centerContainer}>
+                  <Text style={styles.errorText}>No access to camera</Text>
+                </View>
+              ) : (
+                <CameraView
+                  style={styles.camera}
+                  barCodeScannerSettings={{
+                    barCodeTypes: ['qr', 'code128'],
+                  }}
+                  onBarcodeScanned={handleScanCode}
+                />
+              )}
+            </SafeAreaView>
+          </Modal>
+        )}
+      </SafeAreaView>
+    </GestureHandlerRootView>
   );
 }
 
