@@ -5,7 +5,7 @@ import { Header } from '@/components/app/Header';
 import { Colors, Spacing, BorderRadius } from '@/constants/Colors';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/Button';
-import { Coins, X, ChevronRight, TrendingUp, TrendingDown, Edit2 } from 'lucide-react-native';
+import { Coins, X, ChevronRight, TrendingUp, TrendingDown, CreditCard as Edit2 } from 'lucide-react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { CampaignEditModal } from '@/components/marketing/CampaignEditModal';
 
@@ -333,4 +333,13 @@ export default function MarketingScreen() {
                   title="Decline Campaign"
                   variant="outline"
                   onPress={() => handleDecline(selectedCampaign)}
-                  style={styles.
+                  style={styles.declineButton}
+                />
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
+}
