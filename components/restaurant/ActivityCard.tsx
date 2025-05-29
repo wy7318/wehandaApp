@@ -88,7 +88,7 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({
       case 'customers':
         return Colors.success[600];
       case 'analytics':
-        return Colors.primary[600];
+        return Colors.primary[800];
     }
   };
 
