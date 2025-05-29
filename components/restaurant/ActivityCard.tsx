@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, SafeAreaView } from 'react-native';
 import { Colors, BorderRadius, Spacing } from '@/constants/Colors';
-import { ClipboardList, LayoutDashboard, Utensils, Settings, Calendar, Users, ChartLine, X } from 'lucide-react-native';
+import { ClipboardList, LayoutDashboard, Utensils, Settings, Calendar, Users, ChartLine, Megaphone, X } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { WaitlistModal } from './WaitlistModal';
 import { RestaurantSettings } from './RestaurantSettings';
 import { useRestaurant } from '@/contexts/RestaurantContext';
 
-export type ActivityType = 'waitlist' | 'dashboard' | 'table-order' | 'settings' | 'reservations' | 'customers' | 'analytics';
+export type ActivityType = 'waitlist' | 'dashboard' | 'table-order' | 'settings' | 'reservations' | 'customers' | 'analytics' | 'marketing';
 
 interface ActivityCardProps {
   type: ActivityType;
@@ -36,6 +36,8 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({
       router.push('/restaurant/reservations');
     } else if (type === 'customers') {
       router.push(`/restaurant/${restaurantId}/customers`);
+    } else if (type === 'marketing') {
+      router.push(`/restaurant/${restaurantId}/marketing`);
     } else {
       onPress();
     }
@@ -57,6 +59,8 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({
         return <Users size={24} color={Colors.white} />;
       case 'analytics':
         return <ChartLine size={24} color={Colors.white} />;
+      case 'marketing':
+        return <Megaphone size={24} color={Colors.white} />;
     }
   };
 
@@ -76,6 +80,8 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({
         return 'Customers';
       case 'analytics':
         return 'Analytics';
+      case 'marketing':
+        return 'Marketing';
     }
   };
 
@@ -95,6 +101,8 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({
         return Colors.success[600];
       case 'analytics':
         return Colors.primary[800];
+      case 'marketing':
+        return Colors.accent[700];
     }
   };
 

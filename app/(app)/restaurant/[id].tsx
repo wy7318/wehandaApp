@@ -28,6 +28,7 @@ export default function RestaurantDetails() {
     'reservations',
     'customers',
     'analytics',
+    'marketing',
     'table-order',
     'settings'
   ];
@@ -35,7 +36,7 @@ export default function RestaurantDetails() {
   const handleActivityPress = (activityType: ActivityType) => {
     if (activityType === 'analytics') {
       setShowAnalytics(true);
-    } else if (activityType !== 'dashboard' && activityType !== 'waitlist' && activityType !== 'reservations' && activityType !== 'customers') {
+    } else if (activityType !== 'dashboard' && activityType !== 'waitlist' && activityType !== 'reservations' && activityType !== 'customers' && activityType !== 'marketing') {
       alert(`${activityType.charAt(0).toUpperCase() + activityType.slice(1).replace('-', ' ')} selected.`);
     }
   };
