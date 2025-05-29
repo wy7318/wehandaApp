@@ -6,7 +6,7 @@ import { Colors, Spacing, BorderRadius } from '@/constants/Colors';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/Button';
 import { Coins, X, ChevronRight, TrendingUp, TrendingDown } from 'lucide-react-native';
-import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
+import { Swipeable } from 'react-native-gesture-handler';
 
 interface MarketingCampaign {
   name: string;
@@ -311,13 +311,13 @@ export default function MarketingScreen() {
             <Text style={styles.emptyText}>No suggested campaigns</Text>
           </View>
         ) : (
-          <GestureHandlerRootView style={styles.campaignsContainer}>
+          <View style={styles.campaignsContainer}>
             {suggestedCampaigns.map((campaign, index) => (
               <View key={index}>
                 {renderCampaignCard(campaign)}
               </View>
             ))}
-          </GestureHandlerRootView>
+          </View>
         )}
       </View>
 
