@@ -105,13 +105,23 @@ export default function MarketingScreen() {
     }
 
     try {
-      const { error: tokenError } = await supabase
-        .from('restaurants')
-        .update({ marketing_tokens: restaurant.marketing_tokens - 1 })
-        .eq('id', id);
+      // Deduct tokens and get potential new suggestion
+      const { data: deductResult, error: deductError } = await supabase
+        .rpc('deduct_marketing_tokens', {
+          p_restaurant_id: id,
+          p_amount: 1,
+          p_reason: `Approved campaign: ${campaign.name}`,
+          p_generate_suggestion: true
+        });
 
-      if (tokenError) throw tokenError;
+      if (deductError) throw deductError;
 
+      if (!deductResult.success) {
+        Alert.alert('Error', deductResult.message || 'Failed to deduct tokens');
+        return;
+      }
+
+      // Create the campaign
       const { error: campaignError } = await supabase
         .from('marketing_campaigns')
         .insert({
@@ -122,29 +132,60 @@ export default function MarketingScreen() {
 
       if (campaignError) throw campaignError;
 
-      fetchRestaurantData();
+      // Update local state
+      const updatedSuggestions = suggestedCampaigns.filter(c => 
+        c.name !== campaign.name
+      );
+
+      // Add new suggestion if available
+      if (deductResult.new_suggestion) {
+        updatedSuggestions.push(deductResult.new_suggestion);
+      }
+
+      setSuggestedCampaigns(updatedSuggestions);
+      fetchRestaurantData(); // Refresh restaurant data to get updated token count
+      
     } catch (err: any) {
-      setError(err.message);
+      Alert.alert('Error', err.message);
     }
   };
 
   const handleDecline = async (campaign: MarketingCampaign) => {
-    if (!campaign.id) {
-      const updatedSuggestions = suggestedCampaigns.filter(c => c.name !== campaign.name);
-      setSuggestedCampaigns(updatedSuggestions);
-      return;
-    }
-
     try {
+      // For suggested campaigns
+      if (!campaign.id) {
+        // Get new suggestion
+        const { data: newSuggestion, error: suggestionError } = await supabase
+          .rpc('generate_suggested_campaigns', { 
+            p_restaurant_id: id,
+            p_count: 1
+          });
+
+        if (suggestionError) throw suggestionError;
+
+        // Update suggestions list
+        const updatedSuggestions = suggestedCampaigns
+          .filter(c => c.name !== campaign.name);
+
+        if (newSuggestion?.[0]) {
+          updatedSuggestions.push(newSuggestion[0]);
+        }
+
+        setSuggestedCampaigns(updatedSuggestions);
+        return;
+      }
+
+      // For existing campaigns
       const { error } = await supabase
         .from('marketing_campaigns')
         .update({ status: 'cancelled' })
         .eq('id', campaign.id);
 
       if (error) throw error;
+      
       fetchRestaurantData();
     } catch (err: any) {
-      setError(err.message);
+      Alert.alert('Error', err.message);
     }
   };
 
