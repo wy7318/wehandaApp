@@ -4,7 +4,7 @@ import { Header } from '@/components/app/Header';
 import { Colors, Spacing, BorderRadius } from '@/constants/Colors';
 import { supabase } from '@/lib/supabase';
 import { useLocalSearchParams } from 'expo-router';
-import { DollarSign, Gift, Percent, ShoppingBag, Clock, Calendar, X, Check, TrendingUp, Coins, Camera, ChevronRight, Users, BarChart } from 'lucide-react-native';
+import { DollarSign, Gift, Percent, ShoppingBag, Clock, Calendar, X, Check, TrendingUp, Coins, Camera, ChevronRight, Users, ChartBar as BarChart } from 'lucide-react-native';
 import { GestureHandlerRootView, Swipeable, RectButton } from 'react-native-gesture-handler';
 import { Button } from '@/components/ui/Button';
 import { CameraView } from 'expo-camera';
