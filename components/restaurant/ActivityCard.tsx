@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, SafeAreaView } from 'react-native';
 import { Colors, BorderRadius, Spacing } from '@/constants/Colors';
-import { ClipboardList, LayoutDashboard, Utensils, Settings, Calendar, Users, ChartLine } from 'lucide-react-native';
+import { ClipboardList, LayoutDashboard, Utensils, Settings, Calendar, Users, ChartLine, X } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { WaitlistModal } from './WaitlistModal';
+import { RestaurantSettings } from './RestaurantSettings';
+import { useRestaurant } from '@/contexts/RestaurantContext';
 
 export type ActivityType = 'waitlist' | 'dashboard' | 'table-order' | 'settings' | 'reservations' | 'customers' | 'analytics';
 
@@ -19,13 +21,17 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({
   restaurantId,
 }) => {
   const router = useRouter();
+  const { selectedRestaurant, fetchUserRestaurants } = useRestaurant();
   const [showWaitlist, setShowWaitlist] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   const handlePress = () => {
     if (type === 'dashboard') {
       router.push('/restaurant/dashboard');
     } else if (type === 'waitlist') {
       setShowWaitlist(true);
+    } else if (type === 'settings') {
+      setShowSettings(true);
     } else if (type === 'reservations') {
       router.push('/restaurant/reservations');
     } else if (type === 'customers') {
@@ -108,6 +114,31 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({
         onClose={() => setShowWaitlist(false)}
         restaurantId={restaurantId}
       />
+
+      <Modal
+        visible={showSettings}
+        animationType="slide"
+        onRequestClose={() => setShowSettings(false)}
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Restaurant Settings</Text>
+            <TouchableOpacity onPress={() => setShowSettings(false)}>
+              <X size={24} color={Colors.neutral[500]} />
+            </TouchableOpacity>
+          </View>
+
+          {selectedRestaurant && (
+            <RestaurantSettings
+              restaurant={selectedRestaurant}
+              onUpdate={() => {
+                fetchUserRestaurants();
+                setShowSettings(false);
+              }}
+            />
+          )}
+        </SafeAreaView>
+      </Modal>
     </>
   );
 };
@@ -135,5 +166,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Colors.white,
     textAlign: 'center',
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.neutral[200],
+    backgroundColor: Colors.white,
+  },
+  modalTitle: {
+    fontFamily: 'Poppins-Bold',
+    fontSize: 20,
+    color: Colors.neutral[900],
   },
 });
