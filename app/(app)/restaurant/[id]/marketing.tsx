@@ -5,8 +5,9 @@ import { Header } from '@/components/app/Header';
 import { Colors, Spacing, BorderRadius } from '@/constants/Colors';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/Button';
-import { Coins, X, ChevronRight, TrendingUp, TrendingDown } from 'lucide-react-native';
+import { Coins, X, ChevronRight, TrendingUp, TrendingDown, Edit2 } from 'lucide-react-native';
 import { Swipeable } from 'react-native-gesture-handler';
+import { CampaignEditModal } from '@/components/marketing/CampaignEditModal';
 
 interface MarketingCampaign {
   name: string;
@@ -35,10 +36,13 @@ export default function MarketingScreen() {
   const [selectedCampaign, setSelectedCampaign] = useState<MarketingCampaign | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeCampaigns, setActiveCampaigns] = useState<MarketingCampaign[]>([]);
+  const [editingCampaign, setEditingCampaign] = useState<MarketingCampaign | null>(null);
 
   useEffect(() => {
     fetchRestaurantData();
     fetchSuggestedCampaigns();
+    fetchActiveCampaigns();
   }, [id]);
 
   const fetchRestaurantData = async () => {
@@ -72,6 +76,21 @@ export default function MarketingScreen() {
     }
   };
 
+  const fetchActiveCampaigns = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('marketing_campaigns')
+        .select('*')
+        .eq('restaurant_id', id)
+        .eq('status', 'active');
+
+      if (error) throw error;
+      setActiveCampaigns(data || []);
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
   const handleAccept = async (campaign: MarketingCampaign) => {
     if (!restaurant) return;
 
@@ -95,7 +114,6 @@ export default function MarketingScreen() {
 
       if (error) throw error;
 
-      // Remove accepted campaign from suggestions
       setSuggestedCampaigns(prev => prev.filter(c => c.name !== campaign.name));
       setSelectedCampaign(null);
 
@@ -109,7 +127,6 @@ export default function MarketingScreen() {
     if (!restaurant) return;
 
     try {
-      // Deduct token and get new suggestion
       const { data, error } = await supabase.rpc(
         'deduct_marketing_tokens',
         {
@@ -127,24 +144,25 @@ export default function MarketingScreen() {
         return;
       }
 
-      // Remove declined campaign and add new suggestion
       const updatedSuggestions = suggestedCampaigns.filter(c => c.name !== campaign.name);
       if (data.new_suggestion) {
         updatedSuggestions.push(data.new_suggestion);
       }
       setSuggestedCampaigns(updatedSuggestions);
 
-      // Update restaurant tokens
       setRestaurant(prev => prev ? {
         ...prev,
         marketing_tokens: prev.marketing_tokens - 1
       } : null);
 
-      // Close modal if open
       setSelectedCampaign(null);
     } catch (err: any) {
       setError(err.message);
     }
+  };
+
+  const handleEditCampaign = (campaign: MarketingCampaign) => {
+    setEditingCampaign(campaign);
   };
 
   const renderCampaignCard = (campaign: MarketingCampaign) => {
@@ -192,6 +210,51 @@ export default function MarketingScreen() {
           </View>
         </TouchableOpacity>
       </Swipeable>
+    );
+  };
+
+  const renderActiveCampaignCard = (campaign: MarketingCampaign) => {
+    return (
+      <View style={styles.campaignCard}>
+        <View style={styles.campaignHeader}>
+          <Text style={styles.campaignName}>{campaign.name}</Text>
+          <TouchableOpacity 
+            style={styles.editButton}
+            onPress={() => handleEditCampaign(campaign)}
+          >
+            <Edit2 size={20} color={Colors.primary[600]} />
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.campaignDescription}>{campaign.description}</Text>
+        <View style={styles.campaignStats}>
+          <View style={styles.statItem}>
+            <Text style={styles.statLabel}>
+              {campaign.type === 'amount_off' ? 'Discount Amount' : 
+               campaign.type === 'percentage_off' ? 'Discount Percentage' : 
+               'Expected Revenue'}
+            </Text>
+            <Text style={styles.statValue}>
+              {campaign.type === 'amount_off' ? `$${campaign.discount_value}` :
+               campaign.type === 'percentage_off' ? `${campaign.discount_value}%` :
+               `$${campaign.expected_revenue}`}
+            </Text>
+          </View>
+          {campaign.period_type === 'limited_number' && (
+            <View style={styles.statItem}>
+              <Text style={styles.statLabel}>Remaining Redemptions</Text>
+              <Text style={styles.statValue}>{campaign.max_redemptions}</Text>
+            </View>
+          )}
+          {campaign.period_type === 'date_range' && (
+            <View style={styles.statItem}>
+              <Text style={styles.statLabel}>End Date</Text>
+              <Text style={styles.statValue}>
+                {new Date(campaign.end_date!).toLocaleDateString()}
+              </Text>
+            </View>
+          )}
+        </View>
+      </View>
     );
   };
 
@@ -270,288 +333,4 @@ export default function MarketingScreen() {
                   title="Decline Campaign"
                   variant="outline"
                   onPress={() => handleDecline(selectedCampaign)}
-                  style={styles.declineButton}
-                />
-              </View>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-    );
-  };
-
-  return (
-    <SafeAreaView style={styles.container}>
-      <Header />
-      
-      <View style={styles.content}>
-        {restaurant && (
-          <View style={styles.tokenContainer}>
-            <Coins size={24} color={Colors.primary[600]} />
-            <Text style={styles.tokenCount}>
-              {restaurant.marketing_tokens} Marketing Tokens
-            </Text>
-          </View>
-        )}
-
-        <Text style={styles.title}>Suggested Campaigns</Text>
-        
-        {error && (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
-        )}
-
-        {loading ? (
-          <View style={styles.centerContainer}>
-            <Text style={styles.loadingText}>Loading campaigns...</Text>
-          </View>
-        ) : suggestedCampaigns.length === 0 ? (
-          <View style={styles.centerContainer}>
-            <Text style={styles.emptyText}>No suggested campaigns</Text>
-          </View>
-        ) : (
-          <View style={styles.campaignsContainer}>
-            {suggestedCampaigns.map((campaign, index) => (
-              <View key={index}>
-                {renderCampaignCard(campaign)}
-              </View>
-            ))}
-          </View>
-        )}
-      </View>
-
-      {renderCampaignDetails()}
-    </SafeAreaView>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  content: {
-    flex: 1,
-    padding: Spacing.md,
-  },
-  tokenContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.white,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    marginBottom: Spacing.md,
-    shadowColor: Colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  tokenCount: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 16,
-    color: Colors.neutral[900],
-    marginLeft: Spacing.sm,
-  },
-  title: {
-    fontFamily: 'Poppins-Bold',
-    fontSize: 24,
-    color: Colors.neutral[900],
-    marginBottom: Spacing.md,
-  },
-  errorContainer: {
-    backgroundColor: Colors.error[50],
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-    marginBottom: Spacing.md,
-  },
-  errorText: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 14,
-    color: Colors.error[700],
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 16,
-    color: Colors.neutral[600],
-  },
-  emptyText: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 16,
-    color: Colors.neutral[600],
-  },
-  campaignsContainer: {
-    flex: 1,
-  },
-  campaignCard: {
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
-    marginBottom: Spacing.md,
-    shadowColor: Colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  campaignHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.xs,
-  },
-  campaignName: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 18,
-    color: Colors.neutral[900],
-  },
-  campaignDescription: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 14,
-    color: Colors.neutral[600],
-    marginBottom: Spacing.sm,
-  },
-  campaignStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    borderTopWidth: 1,
-    borderTopColor: Colors.neutral[200],
-    paddingTop: Spacing.sm,
-  },
-  statItem: {
-    flex: 1,
-  },
-  statLabel: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 12,
-    color: Colors.neutral[500],
-    marginBottom: 2,
-  },
-  statValue: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 16,
-    color: Colors.neutral[900],
-  },
-  swipeAction: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: 100,
-    height: '100%',
-  },
-  acceptAction: {
-    backgroundColor: Colors.success[500],
-  },
-  declineAction: {
-    backgroundColor: Colors.error[500],
-  },
-  swipeActionText: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 14,
-    color: Colors.white,
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: Colors.background,
-    borderTopLeftRadius: BorderRadius.xl,
-    borderTopRightRadius: BorderRadius.xl,
-    height: '80%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.neutral[200],
-  },
-  modalTitle: {
-    fontFamily: 'Poppins-Bold',
-    fontSize: 20,
-    color: Colors.neutral[900],
-  },
-  modalBody: {
-    padding: Spacing.md,
-  },
-  detailTitle: {
-    fontFamily: 'Poppins-Bold',
-    fontSize: 24,
-    color: Colors.neutral[900],
-    marginBottom: Spacing.xs,
-  },
-  detailDescription: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 16,
-    color: Colors.neutral[600],
-    marginBottom: Spacing.lg,
-  },
-  detailSection: {
-    marginBottom: Spacing.lg,
-  },
-  sectionTitle: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 18,
-    color: Colors.neutral[900],
-    marginBottom: Spacing.sm,
-  },
-  typeTag: {
-    backgroundColor: Colors.primary[100],
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.round,
-    alignSelf: 'flex-start',
-  },
-  typeText: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 14,
-    color: Colors.primary[700],
-  },
-  performanceCard: {
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
-    flexDirection: 'row',
-    gap: Spacing.md,
-  },
-  performanceItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  performanceLabel: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 14,
-    color: Colors.neutral[600],
-    marginVertical: Spacing.xs,
-    textAlign: 'center',
-  },
-  performanceValue: {
-    fontFamily: 'Poppins-Bold',
-    fontSize: 18,
-    color: Colors.neutral[900],
-  },
-  periodText: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 16,
-    color: Colors.neutral[700],
-  },
-  buttonContainer: {
-    gap: Spacing.md,
-    marginTop: Spacing.xl,
-    paddingBottom: Platform.OS === 'ios' ? 34 : Spacing.xl,
-  },
-  acceptButton: {
-    backgroundColor: Colors.success[600],
-  },
-  declineButton: {
-    borderColor: Colors.error[600],
-  },
-});
+                  style={styles.
