@@ -5,8 +5,7 @@ import { Colors, Spacing, BorderRadius } from '@/constants/Colors';
 import { supabase } from '@/lib/supabase';
 import { useLocalSearchParams } from 'expo-router';
 import { DollarSign, Gift, Percent, ShoppingBag, Clock, Calendar, X, Check, TrendingUp, Coins, Camera } from 'lucide-react-native';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import Swipeable from 'react-native-gesture-handler/Swipeable';
+import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
 import { Button } from '@/components/ui/Button';
 import { CameraView } from 'expo-camera';
 
@@ -130,7 +129,6 @@ export default function MarketingScreen() {
   };
 
   const handleDecline = async (campaign: MarketingCampaign) => {
-    // Skip database update for suggested campaigns (they don't exist in the database yet)
     if (!campaign.id) {
       const updatedSuggestions = suggestedCampaigns.filter(c => c.name !== campaign.name);
       setSuggestedCampaigns(updatedSuggestions);
@@ -196,23 +194,23 @@ export default function MarketingScreen() {
     }
   };
 
-  const renderSwipeableActions = (campaign: MarketingCampaign, direction: 'left' | 'right') => {
-    const isRight = direction === 'right';
+  const renderSwipeableActions = (direction: 'left' | 'right') => {
+    const isLeft = direction === 'left';
     return (
       <View
         style={[
           styles.swipeAction,
           {
-            backgroundColor: isRight ? Colors.success[500] : Colors.error[500],
-            right: isRight ? 0 : undefined,
-            left: isRight ? undefined : 0,
+            backgroundColor: isLeft ? Colors.error[500] : Colors.success[500],
+            left: isLeft ? 0 : undefined,
+            right: isLeft ? undefined : 0,
           },
         ]}
       >
-        {isRight ? (
-          <Check size={24} color={Colors.white} />
-        ) : (
+        {isLeft ? (
           <X size={24} color={Colors.white} />
+        ) : (
+          <Check size={24} color={Colors.white} />
         )}
       </View>
     );
@@ -223,83 +221,84 @@ export default function MarketingScreen() {
     const displayStatus = status.charAt(0).toUpperCase() + status.slice(1);
 
     const cardContent = (
-      <TouchableOpacity
-        style={styles.campaignCard}
-        onPress={() => setSelectedCampaign(item)}
-        activeOpacity={0.7}
-      >
-        <View style={styles.cardHeader}>
-          {renderCampaignIcon(item.type)}
-          <View style={styles.headerContent}>
-            <Text style={styles.campaignName}>{item.name}</Text>
-            <View style={styles.statusContainer}>
-              <Text style={[
-                styles.statusText,
-                { color: status === 'active' ? Colors.success[600] : Colors.neutral[600] }
-              ]}>
-                {displayStatus}
+      <View style={styles.campaignCard}>
+        <TouchableOpacity
+          onPress={() => setSelectedCampaign(item)}
+          activeOpacity={0.7}
+          style={styles.cardTouchable}
+        >
+          <View style={styles.cardHeader}>
+            {renderCampaignIcon(item.type)}
+            <View style={styles.headerContent}>
+              <Text style={styles.campaignName}>{item.name}</Text>
+              <View style={styles.statusContainer}>
+                <Text style={[
+                  styles.statusText,
+                  { color: status === 'active' ? Colors.success[600] : Colors.neutral[600] }
+                ]}>
+                  {displayStatus}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          <Text style={styles.description}>{item.description}</Text>
+
+          <View style={styles.detailsContainer}>
+            <View style={styles.detail}>
+              {renderPeriodIcon(item.period_type)}
+              <Text style={styles.detailText}>
+                {item.period_type === 'limited_number'
+                  ? `${item.max_redemptions} redemptions`
+                  : item.period_type === 'date_range'
+                  ? `Until ${new Date(item.end_date!).toLocaleDateString()}`
+                  : 'Unlimited'}
+              </Text>
+            </View>
+
+            <View style={styles.detail}>
+              <TrendingUp size={20} color={Colors.neutral[600]} />
+              <Text style={styles.detailText}>
+                ${item.expected_revenue.toFixed(2)} expected
               </Text>
             </View>
           </View>
-        </View>
 
-        <Text style={styles.description}>{item.description}</Text>
-
-        <View style={styles.detailsContainer}>
-          <View style={styles.detail}>
-            {renderPeriodIcon(item.period_type)}
-            <Text style={styles.detailText}>
-              {item.period_type === 'limited_number'
-                ? `${item.max_redemptions} redemptions`
-                : item.period_type === 'date_range'
-                ? `Until ${new Date(item.end_date!).toLocaleDateString()}`
-                : 'Unlimited'}
-            </Text>
+          <View style={styles.valueContainer}>
+            {item.type === 'amount_off' && (
+              <Text style={styles.valueText}>
+                ${item.discount_value.toFixed(2)} off
+              </Text>
+            )}
+            {item.type === 'percentage_off' && (
+              <Text style={styles.valueText}>
+                {item.discount_value}% off
+              </Text>
+            )}
+            {item.type === 'free_item' && (
+              <Text style={styles.valueText}>
+                Free {item.free_item_name}
+              </Text>
+            )}
+            {item.type === 'bogo' && (
+              <Text style={styles.valueText}>
+                Buy One Get One Free
+              </Text>
+            )}
           </View>
-
-          <View style={styles.detail}>
-            <TrendingUp size={20} color={Colors.neutral[600]} />
-            <Text style={styles.detailText}>
-              ${item.expected_revenue.toFixed(2)} expected
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.valueContainer}>
-          {item.type === 'amount_off' && (
-            <Text style={styles.valueText}>
-              ${item.discount_value.toFixed(2)} off
-            </Text>
-          )}
-          {item.type === 'percentage_off' && (
-            <Text style={styles.valueText}>
-              {item.discount_value}% off
-            </Text>
-          )}
-          {item.type === 'free_item' && (
-            <Text style={styles.valueText}>
-              Free {item.free_item_name}
-            </Text>
-          )}
-          {item.type === 'bogo' && (
-            <Text style={styles.valueText}>
-              Buy One Get One Free
-            </Text>
-          )}
-        </View>
-      </TouchableOpacity>
+        </TouchableOpacity>
+      </View>
     );
 
-    // Only use Swipeable on native platforms
-    if (Platform.OS === 'web') {
+    if (Platform.OS === 'web' || item.status !== 'suggested') {
       return cardContent;
     }
 
     return (
-      <GestureHandlerRootView>
+      <GestureHandlerRootView style={styles.swipeableContainer}>
         <Swipeable
-          renderLeftActions={() => renderSwipeableActions(item, 'left')}
-          renderRightActions={() => renderSwipeableActions(item, 'right')}
+          renderLeftActions={() => renderSwipeableActions('left')}
+          renderRightActions={() => renderSwipeableActions('right')}
           onSwipeableOpen={(direction) => {
             if (direction === 'left') {
               handleDecline(item);
@@ -309,6 +308,9 @@ export default function MarketingScreen() {
           }}
           overshootLeft={false}
           overshootRight={false}
+          friction={2}
+          leftThreshold={SWIPE_THRESHOLD}
+          rightThreshold={SWIPE_THRESHOLD}
         >
           {cardContent}
         </Swipeable>
@@ -442,11 +444,16 @@ const styles = StyleSheet.create({
   scanButton: {
     flex: 1,
   },
+  swipeableContainer: {
+    marginBottom: Spacing.md,
+  },
+  cardTouchable: {
+    flex: 1,
+  },
   campaignCard: {
     backgroundColor: Colors.white,
     borderRadius: BorderRadius.lg,
     padding: Spacing.md,
-    marginBottom: Spacing.md,
     shadowColor: Colors.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
